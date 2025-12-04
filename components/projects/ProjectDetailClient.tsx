@@ -81,9 +81,9 @@ export default function ProjectDetailClient({
               hashtag=""
               tweetsData={posts}
               twitterContributors={[]}
-              twitterContributorsBitcoin={[]}
-              twitterContributorsLitecoin={[]}
-              twitterAdvocates={[]}
+              twitterContributorsBitcoin={project.bitcoinContributors || []}
+              twitterContributorsLitecoin={project.litecoinContributors || []}
+              twitterAdvocates={project.advocates || []}
               twitterUsers={[]}
               isBitcoinOlympics2024={false}
               formatLits={formatLits}

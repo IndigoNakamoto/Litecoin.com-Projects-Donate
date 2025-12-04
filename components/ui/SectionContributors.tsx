@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useState, useCallback } from 'react'
+import ContributorCard from './ContributorCard'
+import type { Contributor } from '@/types/project'
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
@@ -12,17 +14,17 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 function SectionContributors() {
-  const [contributors, setContributors] = useState<any[]>([])
+  const [contributors, setContributors] = useState<Contributor[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchContributors = useCallback(async () => {
     try {
-      const response = await fetch('/api/getContributors')
+      const response = await fetch('/api/contributors')
       if (!response.ok) {
         throw new Error('Failed to fetch contributors')
       }
-      const data: any[] = await response.json()
+      const data: Contributor[] = await response.json()
       const shuffledContributors = shuffleArray(data)
       setContributors(shuffledContributors)
       setLoading(false)
@@ -49,21 +51,7 @@ function SectionContributors() {
     <div className="m-auto flex h-full w-full max-w-[1300px] flex-col items-center justify-center">
       <div className="contributors-list grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
         {contributors.map((contributor) => (
-          <div
-            key={contributor.id}
-            className="flex flex-col items-center justify-center p-2"
-          >
-            {contributor.avatar && (
-              <img
-                src={contributor.avatar}
-                alt={contributor.name || 'Contributor'}
-                className="h-16 w-16 rounded-full"
-              />
-            )}
-            {contributor.name && (
-              <p className="mt-2 text-center text-sm">{contributor.name}</p>
-            )}
-          </div>
+          <ContributorCard key={contributor.id} contributor={contributor} />
         ))}
       </div>
     </div>

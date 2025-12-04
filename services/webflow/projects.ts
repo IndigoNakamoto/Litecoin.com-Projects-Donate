@@ -2,6 +2,7 @@ import { kv } from '@/lib/kv'
 import { createWebflowClient, listCollectionItems } from './client'
 import type { WebflowProject } from './types'
 import type { Project, ProjectSummary } from '@/types/project'
+import { getContributorsByIds } from './contributors'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -204,8 +205,109 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
 }
 
 export async function getProjectBySlug(slug: string): Promise<Project | null> {
-  const projects = await getAllPublishedProjects()
-  return projects.find((p) => p.slug === slug) || null
+  const apiToken = process.env.WEBFLOW_API_TOKEN
+  const collectionId = process.env.WEBFLOW_COLLECTION_ID_PROJECTS
+
+  if (!apiToken || !collectionId) {
+    throw new Error('Webflow API credentials not configured')
+  }
+
+  const client = createWebflowClient(apiToken)
+  
+  // Get status label mapping
+  const statusMap = await createStatusLabelMap(client, collectionId)
+  
+  // Try to get from cache first
+  const cacheKey = `webflow:project:${slug}`
+  try {
+    const cached = await kv.get<Project>(cacheKey)
+    if (cached) {
+      // Ensure contributors are loaded
+      if (!cached.bitcoinContributors && !cached.litecoinContributors && !cached.advocates) {
+        // Fetch contributors if not cached
+        const project = await fetchProjectWithContributors(client, collectionId, slug, statusMap)
+        if (project) {
+          await kv.set(cacheKey, project, { ex: CACHE_TTL })
+          return project
+        }
+      }
+      return cached
+    }
+  } catch (error) {
+    // KV not available, continue
+  }
+
+  const project = await fetchProjectWithContributors(client, collectionId, slug, statusMap)
+  
+  if (project) {
+    // Cache the result
+    try {
+      await kv.set(cacheKey, project, { ex: CACHE_TTL })
+    } catch (error) {
+      // KV not available, continue
+    }
+  }
+
+  return project
+}
+
+async function fetchProjectWithContributors(
+  client: ReturnType<typeof createWebflowClient>,
+  collectionId: string,
+  slug: string,
+  statusMap: { [key: string]: string }
+): Promise<Project | null> {
+  // Fetch all projects and find the one with matching slug
+  const allProjects = await listCollectionItems<WebflowProject>(
+    client,
+    collectionId
+  )
+
+  const webflowProject = allProjects.find((p) => p.fieldData.slug === slug && !p.isDraft && !p.isArchived)
+
+  if (!webflowProject) {
+    return null
+  }
+
+  const statusId = webflowProject.fieldData.status
+  const statusLabel = statusMap[statusId] || statusId
+
+  // Fetch contributors
+  const [bitcoinContributors, litecoinContributors, advocates] = await Promise.all([
+    getContributorsByIds(webflowProject.fieldData['bitcoin-contributors'] || []),
+    getContributorsByIds(webflowProject.fieldData['litecoin-contributors'] || []),
+    getContributorsByIds(webflowProject.fieldData.advocates || []),
+  ])
+
+  const project: Project = {
+    id: webflowProject.id,
+    name: webflowProject.fieldData.name,
+    slug: webflowProject.fieldData.slug,
+    summary: webflowProject.fieldData.summary,
+    content: webflowProject.fieldData.content,
+    coverImage: webflowProject.fieldData['cover-image']?.url,
+    status: statusLabel,
+    projectType: webflowProject.fieldData['project-type'],
+    hidden: webflowProject.fieldData.hidden,
+    recurring: webflowProject.fieldData.recurring,
+    totalPaid: webflowProject.fieldData['total-paid'],
+    serviceFeesCollected: webflowProject.fieldData['service-fees-collected'],
+    website: webflowProject.fieldData['website-link'],
+    github: webflowProject.fieldData['github-link'],
+    twitter: webflowProject.fieldData['twitter-link'],
+    discord: webflowProject.fieldData['discord-link'],
+    telegram: webflowProject.fieldData['telegram-link'],
+    reddit: webflowProject.fieldData['reddit-link'],
+    facebook: webflowProject.fieldData['facebook-link'],
+    lastPublished: webflowProject.lastPublished,
+    lastUpdated: webflowProject.lastUpdated,
+    createdOn: webflowProject.createdOn,
+    bitcoinContributors: bitcoinContributors.length > 0 ? bitcoinContributors : undefined,
+    litecoinContributors: litecoinContributors.length > 0 ? litecoinContributors : undefined,
+    advocates: advocates.length > 0 ? advocates : undefined,
+  }
+
+  return project
 }
 
 export async function getProjectSummaries(): Promise<ProjectSummary[]> {

@@ -1,3 +1,16 @@
+export interface Contributor {
+  id: string
+  name: string
+  slug: string
+  avatar?: string
+  twitterLink?: string
+  discordLink?: string
+  githubLink?: string
+  youtubeLink?: string
+  linkedinLink?: string
+  email?: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -21,6 +34,9 @@ export interface Project {
   lastPublished: string
   lastUpdated: string
   createdOn: string
+  bitcoinContributors?: Contributor[]
+  litecoinContributors?: Contributor[]
+  advocates?: Contributor[]
 }
 
 export interface ProjectSummary {

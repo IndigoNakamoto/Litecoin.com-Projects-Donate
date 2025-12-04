@@ -4,6 +4,7 @@ import React from 'react'
 import ProjectContent from './ProjectContent'
 import ProjectUpdate from './ProjectUpdate'
 import { TwitterUser } from '@/utils/types'
+import type { Contributor } from '@/types/project'
 
 type MenuSectionsProps = {
   selectedMenuItem: string
@@ -18,9 +19,9 @@ type MenuSectionsProps = {
   hashtag: string
   tweetsData: any
   twitterContributors: TwitterUser[]
-  twitterContributorsBitcoin: TwitterUser[]
-  twitterContributorsLitecoin: TwitterUser[]
-  twitterAdvocates: TwitterUser[]
+  twitterContributorsBitcoin: Contributor[] | TwitterUser[]
+  twitterContributorsLitecoin: Contributor[] | TwitterUser[]
+  twitterAdvocates: Contributor[] | TwitterUser[]
   twitterUsers: TwitterUser[]
   isBitcoinOlympics2024: boolean
   formatLits: (value: any) => string
@@ -68,6 +69,9 @@ const MenuSections: React.FC<MenuSectionsProps> = ({
               telegramLink={telegramLink}
               facebookLink={facebookLink}
               redditLink={redditLink}
+              bitcoinContributors={twitterContributorsBitcoin as Contributor[]}
+              litecoinContributors={twitterContributorsLitecoin as Contributor[]}
+              advocates={twitterAdvocates as Contributor[]}
             />
           </div>
         </div>

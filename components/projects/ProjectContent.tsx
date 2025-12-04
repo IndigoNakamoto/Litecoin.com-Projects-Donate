@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react'
 import ProjectSocialLinks from './ProjectSocialLinks'
+import ProjectContributors from './ProjectContributors'
+import type { Contributor } from '@/types/project'
 
 type ProjectContentProps = {
   title: string
@@ -14,6 +16,9 @@ type ProjectContentProps = {
   telegramLink?: string
   facebookLink?: string
   redditLink?: string
+  bitcoinContributors?: Contributor[]
+  litecoinContributors?: Contributor[]
+  advocates?: Contributor[]
 }
 
 const ProjectContent: React.FC<ProjectContentProps> = ({
@@ -27,6 +32,9 @@ const ProjectContent: React.FC<ProjectContentProps> = ({
   telegramLink,
   facebookLink,
   redditLink,
+  bitcoinContributors,
+  litecoinContributors,
+  advocates,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -89,6 +97,11 @@ const ProjectContent: React.FC<ProjectContentProps> = ({
       {content && (
         <div className="markdown" dangerouslySetInnerHTML={{ __html: content }} />
       )}
+      <ProjectContributors
+        bitcoinContributors={bitcoinContributors}
+        litecoinContributors={litecoinContributors}
+        advocates={advocates}
+      />
     </div>
   )
 }
