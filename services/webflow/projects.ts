@@ -5,6 +5,111 @@ import type { Project, ProjectSummary } from '@/types/project'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
+// Cache for status ID to label mapping
+let statusLabelMap: { [key: string]: string } | null = null
+const STATUS_MAP_CACHE_KEY = 'webflow:projects:status-map'
+
+interface CollectionSchemaField {
+  id: string
+  slug: string
+  type: string
+  displayName: string
+  validations?: {
+    options?: Array<{
+      id: string
+      name: string
+    }>
+  }
+}
+
+interface CollectionSchema {
+  id: string
+  displayName: string
+  fields: CollectionSchemaField[]
+}
+
+/**
+ * Get the collection schema from Webflow API
+ */
+async function getCollectionSchema(
+  client: ReturnType<typeof createWebflowClient>,
+  collectionId: string
+): Promise<CollectionSchema> {
+  try {
+    const response = await client.get<CollectionSchema>(
+      `/collections/${collectionId}`
+    )
+    return response.data
+  } catch (error: any) {
+    console.error(
+      `Error fetching collection schema for ${collectionId}:`,
+      error.response?.data || error.message
+    )
+    throw error
+  }
+}
+
+/**
+ * Create a mapping from status option IDs to their labels
+ */
+async function createStatusLabelMap(
+  client: ReturnType<typeof createWebflowClient>,
+  collectionId: string
+): Promise<{ [key: string]: string }> {
+  // Try to get from cache first
+  try {
+    const cached = await kv.get<{ [key: string]: string }>(STATUS_MAP_CACHE_KEY)
+    if (cached) {
+      statusLabelMap = cached
+      return cached
+    }
+  } catch (error) {
+    // Cache not available, continue
+  }
+
+  const schema = await getCollectionSchema(client, collectionId)
+  const statusField = schema.fields.find((f) => f.slug === 'status')
+
+  if (!statusField) {
+    throw new Error('Status field not found in collection schema')
+  }
+
+  if (!statusField.validations || !statusField.validations.options) {
+    throw new Error('Status field is not an Option field')
+  }
+
+  const map: { [key: string]: string } = {}
+  statusField.validations.options.forEach((option) => {
+    map[option.id] = option.name.trim()
+  })
+
+  statusLabelMap = map
+
+  // Cache the mapping
+  try {
+    await kv.set(STATUS_MAP_CACHE_KEY, map, { ex: CACHE_TTL })
+  } catch (error) {
+    // Cache not available, continue
+  }
+
+  return map
+}
+
+/**
+ * Get the label for a status ID
+ */
+async function getStatusLabel(
+  client: ReturnType<typeof createWebflowClient>,
+  collectionId: string,
+  statusId: string
+): Promise<string> {
+  if (!statusLabelMap) {
+    await createStatusLabelMap(client, collectionId)
+  }
+
+  return statusLabelMap?.[statusId] || statusId // Fallback to ID if not found
+}
+
 export async function getAllPublishedProjects(): Promise<Project[]> {
   const apiToken = process.env.WEBFLOW_API_TOKEN
   const collectionId = process.env.WEBFLOW_COLLECTION_ID_PROJECTS
@@ -13,57 +118,79 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
     throw new Error('Webflow API credentials not configured')
   }
 
+  const client = createWebflowClient(apiToken)
+  
+  // Get status label mapping first (needed for both cached and fresh data)
+  const statusMap = await createStatusLabelMap(client, collectionId)
+  
   const cacheKey = 'webflow:projects:published'
   let cached: Project[] | null = null
   
   // Try to get from cache, but don't fail if KV is not configured
   try {
     cached = await kv.get<Project[]>(cacheKey)
+    // If we have cached data, ensure status labels are mapped (in case cache has old IDs)
+    if (cached) {
+      // Check if any project has a status that looks like an ID (long alphanumeric string)
+      // If so, re-map the statuses
+      const needsRemapping = cached.some(p => p.status && p.status.length > 20 && !p.status.includes(' '))
+      if (needsRemapping) {
+        console.log('Remapping status IDs to labels in cached projects')
+        cached = cached.map(p => ({
+          ...p,
+          status: statusMap[p.status] || p.status
+        }))
+      }
+      return cached
+    }
   } catch (error) {
     // KV not configured or unavailable, continue without cache
     console.warn('KV cache unavailable, fetching directly from Webflow')
   }
-
-  if (cached) {
-    return cached
-  }
-
-  const client = createWebflowClient(apiToken)
+  
   const allProjects = await listCollectionItems<WebflowProject>(
     client,
     collectionId
   )
 
-  // Filter to only published projects
+  // Filter to only published and non-hidden projects
   const publishedProjects = allProjects.filter(
-    (project) => !project.isDraft && !project.isArchived
+    (project) => 
+      !project.isDraft && 
+      !project.isArchived &&
+      !project.fieldData.hidden // Also filter out hidden projects at the source
   )
 
-  // Transform to our Project type
-  const projects: Project[] = publishedProjects.map((project) => ({
-    id: project.id,
-    name: project.fieldData.name,
-    slug: project.fieldData.slug,
-    summary: project.fieldData.summary,
-    content: project.fieldData.content,
-    coverImage: project.fieldData['cover-image']?.url,
-    status: project.fieldData.status,
-    projectType: project.fieldData['project-type'],
-    hidden: project.fieldData.hidden,
-    recurring: project.fieldData.recurring,
-    totalPaid: project.fieldData['total-paid'],
-    serviceFeesCollected: project.fieldData['service-fees-collected'],
-    website: project.fieldData['website-link'],
-    github: project.fieldData['github-link'],
-    twitter: project.fieldData['twitter-link'],
-    discord: project.fieldData['discord-link'],
-    telegram: project.fieldData['telegram-link'],
-    reddit: project.fieldData['reddit-link'],
-    facebook: project.fieldData['facebook-link'],
-    lastPublished: project.lastPublished,
-    lastUpdated: project.lastUpdated,
-    createdOn: project.createdOn,
-  }))
+  // Transform to our Project type, mapping status IDs to labels
+  const projects: Project[] = publishedProjects.map((project) => {
+    const statusId = project.fieldData.status
+    const statusLabel = statusMap[statusId] || statusId // Use label if available, fallback to ID
+    
+    return {
+      id: project.id,
+      name: project.fieldData.name,
+      slug: project.fieldData.slug,
+      summary: project.fieldData.summary,
+      content: project.fieldData.content,
+      coverImage: project.fieldData['cover-image']?.url,
+      status: statusLabel, // Use the mapped label instead of the ID
+      projectType: project.fieldData['project-type'],
+      hidden: project.fieldData.hidden,
+      recurring: project.fieldData.recurring,
+      totalPaid: project.fieldData['total-paid'],
+      serviceFeesCollected: project.fieldData['service-fees-collected'],
+      website: project.fieldData['website-link'],
+      github: project.fieldData['github-link'],
+      twitter: project.fieldData['twitter-link'],
+      discord: project.fieldData['discord-link'],
+      telegram: project.fieldData['telegram-link'],
+      reddit: project.fieldData['reddit-link'],
+      facebook: project.fieldData['facebook-link'],
+      lastPublished: project.lastPublished,
+      lastUpdated: project.lastUpdated,
+      createdOn: project.createdOn,
+    }
+  })
 
   // Cache the results (if KV is available)
   try {
