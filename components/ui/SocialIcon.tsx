@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   FaXTwitter,
-  FaTwitter,
   FaRedditAlien,
   FaFacebookF,
   FaGithub,
@@ -15,6 +14,7 @@ import {
   FaDiscord,
   FaTelegram,
 } from 'react-icons/fa6'
+import { FaLink } from 'react-icons/fa'
 
 interface SocialIconProps {
   kind: string
@@ -33,7 +33,7 @@ const SocialIcon: React.FC<SocialIconProps> = ({
 }) => {
   const iconProps = {
     size: size,
-    className: className || 'text-gray-700',
+    className: className || 'h-5 w-5 fill-current text-gray-700 transition-colors group-hover:text-gray-900',
   }
 
   const getIcon = () => {
@@ -59,6 +59,8 @@ const SocialIcon: React.FC<SocialIconProps> = ({
         return <FaEnvelope {...iconProps} />
       case 'website':
         return <FaGlobe {...iconProps} />
+      case 'link':
+        return <FaLink {...iconProps} />
       case 'info':
         return <FaCircleInfo {...iconProps} />
       default:
@@ -67,7 +69,11 @@ const SocialIcon: React.FC<SocialIconProps> = ({
   }
 
   if (noLink || !href) {
-    return getIcon()
+    return (
+      <div className="flex items-center justify-center h-10 w-10 rounded-lg transition-colors group-hover:text-gray-900">
+        {getIcon()}
+      </div>
+    )
   }
 
   return (

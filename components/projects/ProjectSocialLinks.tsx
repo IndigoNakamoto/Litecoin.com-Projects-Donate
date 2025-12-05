@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import Link from 'next/link'
+import SocialIcon from '@/components/ui/SocialIcon'
 
 type ProjectSocialLinksProps = {
   website?: string
@@ -71,6 +71,9 @@ const ProjectSocialLinks: React.FC<ProjectSocialLinksProps> = ({
             rel="noopener noreferrer"
             className="group flex items-center space-x-2 text-[#222222] no-underline transition-colors duration-300 hover:font-semibold hover:text-gray-900"
           >
+            <span className="inline-block text-gray-600 transition-colors duration-300 hover:text-gray-900">
+              <SocialIcon kind={link.kind} href={link.url} noLink />
+            </span>
             <span className="text-md leading-none text-[#222222] group-hover:text-gray-900">
               {formatLinkText(link.kind, link.url)}
             </span>
@@ -89,6 +92,9 @@ const ProjectSocialLinks: React.FC<ProjectSocialLinksProps> = ({
           tabIndex={0}
           className="group flex cursor-pointer items-center space-x-2 text-[#222222] no-underline transition-colors duration-300 hover:font-semibold hover:text-gray-900"
         >
+          <span className="inline-block text-gray-600 transition-colors duration-300 hover:text-gray-900">
+            <SocialIcon kind="info" href="#" noLink />
+          </span>
           <span className="text-md leading-none text-[#222222] group-hover:text-gray-900 group-hover:underline">
             How Donations Work
           </span>
