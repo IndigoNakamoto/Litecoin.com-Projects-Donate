@@ -13,7 +13,7 @@ type AsideSectionProps = {
   title: string
   coverImage: string
   addressStats?: AddressStats
-  formatUSD?: (value: number) => string
+  formatUSD?: (value: number | string) => string
   formatLits?: (value: number) => string
   litecoinRaised?: number
   litecoinPaid?: number
@@ -36,7 +36,10 @@ const AsideSection: React.FC<AsideSectionProps> = ({
   title,
   coverImage,
   addressStats = defaultAddressStats,
-  formatUSD = (v) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  formatUSD = (v: number | string) => {
+    const num = typeof v === 'string' ? Number(v) : v
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  },
   formatLits,
   litecoinRaised,
   litecoinPaid,
@@ -55,7 +58,7 @@ const AsideSection: React.FC<AsideSectionProps> = ({
   return (
     <aside className="top-32 mb-8 flex min-w-[20rem] flex-col space-y-4 rounded-md bg-[#dddddd] p-4 lg:sticky lg:flex-col lg:space-x-4 lg:space-y-0">
       <div className="relative w-full max-w-full">
-        <div className="relative aspect-square w-full min-h-[150px]">
+        <div className="relative aspect-video w-full min-h-[150px]">
           <Image
             loader={customImageLoader}
             src={coverImage}

@@ -11,7 +11,7 @@ type SharedStatsProps = {
 }
 
 type StatItemProps = {
-  value: string | number
+  value: string | number | React.ReactNode
   label: string
 }
 
@@ -65,50 +65,57 @@ const StandardStats: React.FC<
   const formattedCommunityLtc = litecoinRaised.toFixed(2)
   const formattedLtcPaid = litecoinPaid.toFixed(2)
 
-  const hasLtcRaised = litecoinRaised > 0
   const hasLtcPaid = litecoinPaid > 0 && !!formatLits
   const hasUsdPaid = totalPaid > 0
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
         <h3 className="font-space-grotesk text-lg font-bold text-gray-800">
           Funding Summary
         </h3>
-        {litecoinRaised > 0 && (
-          <StatItem
-            value={`Ł ${formattedCommunityLtc}`}
-            label="Community Raised (LTC)"
-          />
-        )}
-        <StatItem
-          value={`$ ${formatUSD(communityRaisedUSD)}`}
-          label="Community Raised (USD)"
-        />
-
-        {totalMatched > 0 && (
-          <StatItem
-            value={`$ ${formatUSD(totalMatched)}`}
-            label="From Matching Partners"
-          />
-        )}
-      </div>
-
-
-      <div className="border-t border-gray-400/60 pt-4">
         <div className="flex flex-col gap-4">
           <StatItem
             value={addressStats.tx_count || 0}
-            label="Total Donations"
+            label="Number of Donations"
           />
-          <div>
-            <h4 className="font-space-grotesk text-3xl font-semibold" style={{ color: '#345D9D' }}>
-              {hasLtcPaid && `Ł ${formattedLtcPaid}`}
-              {hasLtcPaid && hasUsdPaid && ' + '}
-              {hasUsdPaid && `$ ${formatUSD(totalPaid)}`}
-              {!hasLtcPaid && !hasUsdPaid && `$ ${formatUSD(0)}`}
-            </h4>
-            <h4 className="text-black">Total Paid to Contributors</h4>
+          {litecoinRaised > 0 && (
+            <StatItem
+              value={`Ł ${formattedCommunityLtc}`}
+              label="Community Donations (LTC)"
+            />
+          )}
+          <StatItem
+            value={`$ ${formatUSD(communityRaisedUSD)}`}
+            label="Community Donations (USD)"
+          />
+
+          {totalMatched > 0 && (
+            <StatItem
+              value={`$ ${formatUSD(totalMatched)}`}
+              label="Matching Contributions"
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-gray-400/60 pt-5">
+        <div className="flex flex-col gap-5">
+          <h3 className="font-space-grotesk text-lg font-bold text-gray-800">
+            Impact Summary
+          </h3>
+          <div className="flex flex-col gap-4">
+            <StatItem
+              value={
+                <>
+                  {hasLtcPaid && `Ł ${formattedLtcPaid}`}
+                  {hasLtcPaid && hasUsdPaid && ' + '}
+                  {hasUsdPaid && `$ ${formatUSD(totalPaid)}`}
+                  {!hasLtcPaid && !hasUsdPaid && `$ ${formatUSD(0)}`}
+                </>
+              }
+              label="Paid to Contributors"
+            />
           </div>
         </div>
       </div>
@@ -118,7 +125,7 @@ const StandardStats: React.FC<
 
 type DonationStatsProps = {
   addressStats?: AddressStats
-  formatUSD: (value: any) => string
+  formatUSD: (value: number | string) => string
   formatLits?: (value: number) => string
   isBitcoinOlympics2024?: boolean
   isRecurring?: boolean
@@ -138,14 +145,13 @@ type DonationStatsProps = {
 
 const DonationStats: React.FC<DonationStatsProps> = ({
   addressStats = defaultAddressStats,
-  isBitcoinOlympics2024 = false,
-  isRecurring = false,
   formatUSD,
   totalPaid,
   ...props
 }) => {
   // For now, just use StandardStats
   // Can add BitcoinOlympicsStats and RecurringStats later if needed
+  // isBitcoinOlympics2024 and isRecurring are passed via ...props for future use
   return (
     <StandardStats
       addressStats={addressStats}
