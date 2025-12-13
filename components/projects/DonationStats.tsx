@@ -61,14 +61,11 @@ const StandardStats: React.FC<
     },
     0
   )
-  // Round grand total to avoid floating point precision issues
-  const grandTotalUSD = Math.round((communityRaisedUSD + totalMatched) * 100) / 100
 
   const formattedCommunityLtc = litecoinRaised.toFixed(2)
   const formattedLtcPaid = litecoinPaid.toFixed(2)
 
   const hasLtcRaised = litecoinRaised > 0
-  const hasUsdRaised = grandTotalUSD > 0
   const hasLtcPaid = litecoinPaid > 0 && !!formatLits
   const hasUsdPaid = totalPaid > 0
 
@@ -97,17 +94,6 @@ const StandardStats: React.FC<
         )}
       </div>
 
-      <div className="border-t border-gray-400/60 pt-4">
-        <div>
-          <h4 className="font-space-grotesk text-3xl font-semibold" style={{ color: '#345D9D' }}>
-            {hasLtcRaised && `Ł ${formattedCommunityLtc}`}
-            {hasLtcRaised && hasUsdRaised && ' + '}
-            {hasUsdRaised && `$ ${formatUSD(grandTotalUSD)}`}
-            {!hasLtcRaised && !hasUsdRaised && `$ ${formatUSD(0)}`}
-          </h4>
-          <h4 className="text-black">Total Raised</h4>
-        </div>
-      </div>
 
       <div className="border-t border-gray-400/60 pt-4">
         <div className="flex flex-col gap-4">
