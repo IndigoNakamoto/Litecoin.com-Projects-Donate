@@ -16,12 +16,12 @@ export default function PaymentModalStockDonorSignature({
   onContinue,
 }: PaymentModalStockDonorSignatureProps) {
   const { state, dispatch } = useDonation()
-  const signaturePadRef = useRef<SignatureCanvas | null>(null)
+  const signaturePadRef = useRef<SignatureCanvas>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [isButtonDisabled, setIsButtonDisabled] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [canvasWidth, setCanvasWidth] = useState(445)
-  const [canvasHeight, setCanvasHeight] = useState(200)
+  const canvasHeight = 200
 
   // Function to update canvas width based on parent container
   const updateCanvasSize = () => {

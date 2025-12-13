@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DonateSection from '@/components/ui/DonateSection'
 import SectionMatchingDonations from '@/components/ui/SectionMatchingDonations'
@@ -13,7 +13,7 @@ import { useDonation } from '@/contexts/DonationContext'
 // TODO: Import PaymentForm when it's migrated
 // import PaymentForm from '@/components/PaymentForm'
 
-export default function DonatePage() {
+function ResetHandler() {
   const { dispatch } = useDonation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -28,6 +28,11 @@ export default function DonatePage() {
       router.replace(newUrl.pathname + newUrl.search)
     }
   }, [dispatch, reset, router])
+
+  return null
+}
+
+function DonatePageContent() {
 
   return (
     <>
@@ -85,6 +90,15 @@ export default function DonatePage() {
         </div>
       </SectionWhite>
     </>
+  )
+}
+
+export default function DonatePage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetHandler />
+      <DonatePageContent />
+    </Suspense>
   )
 }
 

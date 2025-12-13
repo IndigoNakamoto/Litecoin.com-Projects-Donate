@@ -8,10 +8,10 @@ import ProjectDetailClient from '@/components/projects/ProjectDetailClient'
 export default async function ProjectPage({
   params,
 }: {
-  params: Promise<{ slug: string }> | { slug: string }
+  params: Promise<{ slug: string }>
 }) {
-  // Handle both sync and async params (Next.js 15+ uses Promise)
-  const resolvedParams = params instanceof Promise ? await params : params
+  // Next.js 15+ params are always a Promise
+  const resolvedParams = await params
   
   let project
   let faqs: FAQItem[] = []

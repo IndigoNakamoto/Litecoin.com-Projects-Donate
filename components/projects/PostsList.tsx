@@ -24,13 +24,14 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
   const renderedPosts = posts.map((post) => {
     const { id, fieldData } = post
     
-    // Try multiple field name variations
-    const xPostLink = fieldData['x-post-link'] || fieldData['x_post_link'] || (fieldData as any)['xPostLink']
-    const youtubeLink = fieldData['youtube-link'] || fieldData['youtube_link'] || (fieldData as any)['youtubeLink']
-    const redditLink = fieldData['reddit-link'] || fieldData['reddit_link'] || (fieldData as any)['redditLink']
+    // Access fields using the correct property names with dashes
+    const xPostLink = fieldData['x-post-link']
+    const youtubeLink = fieldData['youtube-link']
+    const redditLink = fieldData['reddit-link']
     
     // Also check for a single 'link' field (as in old implementation)
-    const link = (fieldData as any).link || (fieldData as any)['link']
+    // Use type assertion for fields not in the type definition
+    const link = (fieldData as Record<string, unknown>).link as string | undefined
 
     // If there's a single 'link' field, try to determine its type
     if (link && !xPostLink && !youtubeLink && !redditLink) {

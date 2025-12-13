@@ -18,6 +18,8 @@ export interface WebflowProject {
     recurring: boolean
     'service-fees-collected': number
     'total-paid': number
+    'litecoin-raised'?: number
+    'litecoin-paid'?: number
     summary: string
     name: string
     slug: string

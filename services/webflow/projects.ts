@@ -7,6 +7,7 @@ import { getContributorsByIds } from './contributors'
 const CACHE_TTL = 259200 // 3 days in seconds
 
 // Cache for status ID to label mapping
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let statusLabelMap: { [key: string]: string } | null = null
 const STATUS_MAP_CACHE_KEY = 'webflow:projects:status-map'
 const SCHEMA_CACHE_KEY_PREFIX = 'webflow:schema:'
@@ -46,7 +47,7 @@ async function getCollectionSchema(
     if (cached) {
       return cached
     }
-  } catch (_error) {
+  } catch {
     // KV not available, continue
   }
 
@@ -58,7 +59,7 @@ async function getCollectionSchema(
     // Cache the schema
     try {
       await kv.set(cacheKey, response.data, { ex: CACHE_TTL })
-    } catch (_error) {
+    } catch {
       // KV not available, continue
     }
     
@@ -75,7 +76,7 @@ async function getCollectionSchema(
         if (cached) {
           return cached
         }
-      } catch (_cacheError) {
+      } catch {
         // Cache not available
       }
       console.warn(
@@ -110,7 +111,7 @@ async function createStatusLabelMap(
       statusLabelMap = cached
       return cached
     }
-  } catch (_error) {
+  } catch {
     // Cache not available, continue
   }
 
@@ -151,7 +152,7 @@ async function createStatusLabelMap(
     // Cache the mapping
     try {
       await kv.set(STATUS_MAP_CACHE_KEY, map, { ex: CACHE_TTL })
-    } catch (_error) {
+    } catch {
       // Cache not available, continue
     }
 
@@ -169,7 +170,7 @@ async function createStatusLabelMap(
         statusLabelMap = cached
         return cached
       }
-    } catch (_cacheError) {
+    } catch {
       // Cache not available
     }
     
@@ -214,7 +215,7 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
       }
       return cached
     }
-  } catch (error) {
+  } catch {
     // KV not configured or unavailable, continue without cache
     console.warn('KV cache unavailable, fetching directly from Webflow')
   }
@@ -266,7 +267,7 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
   // Cache the results (if KV is available)
   try {
     await kv.set(cacheKey, projects, { ex: CACHE_TTL })
-  } catch (error) {
+  } catch {
     // KV not configured or unavailable, continue without caching
     console.warn('KV cache unavailable, skipping cache write')
   }
@@ -297,7 +298,7 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
       // TODO: Re-enable cache after debugging
       // return cached
     }
-  } catch (error) {
+  } catch {
     // KV not available, continue
   }
 
@@ -307,7 +308,7 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
     // Cache the result
     try {
       await kv.set(cacheKey, project, { ex: CACHE_TTL })
-    } catch (error) {
+    } catch {
       // KV not available, continue
     }
   } else {
@@ -329,9 +330,6 @@ async function fetchProjectWithContributors(
       client,
       collectionId
     )
-
-    // Check for exact match first
-    const exactMatch = allProjects.find((p) => p.fieldData.slug === slug)
 
     const webflowProject = allProjects.find((p) => p.fieldData.slug === slug && !p.isDraft && !p.isArchived)
 

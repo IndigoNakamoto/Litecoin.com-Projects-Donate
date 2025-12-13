@@ -44,7 +44,7 @@ const Navigation = () => {
     }
   }, [])
 
-  const toggleDropdown = (menu) => {
+  const toggleDropdown = (menu: 'useLitecoin' | 'theFoundation' | 'learn') => {
     setDropdownOpen((prev) => ({
       useLitecoin: menu === 'useLitecoin' ? !prev.useLitecoin : false,
       theFoundation: menu === 'theFoundation' ? !prev.theFoundation : false,
@@ -52,17 +52,29 @@ const Navigation = () => {
     }))
   }
 
-  const toggleMobileDropdown = (menu) => {
+  const titleToKey = (title: string): keyof typeof mobileDropdownOpen => {
+    const mapping: Record<string, keyof typeof mobileDropdownOpen> = {
+      'Use Litecoin': 'useLitecoin',
+      'Learn': 'learn',
+      'The Foundation': 'theFoundation',
+    }
+    return mapping[title] || 'learn'
+  }
+
+  const toggleMobileDropdown = (menu: keyof typeof mobileDropdownOpen) => {
     setMobileDropdownOpen((prevState) => ({
       ...prevState,
       [menu]: !prevState[menu], // Toggle the specific dropdown
     }))
   }
 
-  const handleClickOutside = (event) => {
+  const handleClickOutside = (event: MouseEvent) => {
+    const target = event.target as Node | null
+    
     if (
       useLitecoinRef.current &&
-      !useLitecoinRef.current.contains(event.target)
+      target &&
+      !useLitecoinRef.current.contains(target)
     ) {
       setDropdownOpen((prev) => ({
         ...prev,
@@ -71,7 +83,8 @@ const Navigation = () => {
     }
     if (
       theFoundationRef.current &&
-      !theFoundationRef.current.contains(event.target)
+      target &&
+      !theFoundationRef.current.contains(target)
     ) {
       setDropdownOpen((prev) => ({
         ...prev,
@@ -79,7 +92,7 @@ const Navigation = () => {
       }))
     }
 
-    if (learnRef.current && !learnRef.current.contains(event.target)) {
+    if (learnRef.current && target && !learnRef.current.contains(target)) {
       setDropdownOpen((prev) => ({
         ...prev,
         learn: false,
@@ -107,11 +120,7 @@ const Navigation = () => {
   }
 
   const maxScrollHeight = 225
-  const minHeight = 80
-  const initialHeight = 80
   const bgOpacity = Math.min(scrollPosition / maxScrollHeight, 1)
-  const baseHeaderHeight = isMobile ? initialHeight - 10 : initialHeight
-  const minHeaderHeight = isMobile ? minHeight - 10 : minHeight
   // const headerHeight = Math.max(
   //   baseHeaderHeight -
   //     (scrollPosition / maxScrollHeight) * (baseHeaderHeight - minHeaderHeight),
@@ -136,18 +145,17 @@ const Navigation = () => {
     12
   )
 
-  const interpolateColor = (startColor, endColor, factor) => {
-    const result = startColor
-      .slice(1)
-      .match(/.{2}/g)
-      .map((hex, i) => {
-        return Math.round(
-          parseInt(hex, 16) * (1 - factor) +
-            parseInt(endColor.slice(1).match(/.{2}/g)[i], 16) * factor
-        )
-          .toString(16)
-          .padStart(2, '0')
-      })
+  const interpolateColor = (startColor: string, endColor: string, factor: number) => {
+    const startMatch = startColor.slice(1).match(/.{2}/g) || []
+    const endMatch = endColor.slice(1).match(/.{2}/g) || []
+    const result = startMatch.map((hex, i) => {
+      return Math.round(
+        parseInt(hex, 16) * (1 - factor) +
+          parseInt(endMatch[i] || '00', 16) * factor
+      )
+        .toString(16)
+        .padStart(2, '0')
+    })
     return `#${result.join('')}`
   }
 
@@ -297,7 +305,6 @@ const Navigation = () => {
                     onClick={() => toggleDropdown('learn')}
                     aria-expanded={dropdownOpen.learn}
                     aria-haspopup="true"
-                    ref={learnRef as React.RefObject<HTMLButtonElement>} // Updated
                     style={{ color: fontColor }}
                   >
                     Learn
@@ -518,10 +525,10 @@ const Navigation = () => {
               { title: 'Shop', link: 'https://shop.litecoin.com' },
               { title: 'Explorer', link: 'https://litecoinspace.org/' },
             ].map((item) => {
-              const itemKey = item.title.replace(' ', '').toLowerCase()
+              const itemKey = item.dropdown ? titleToKey(item.title) : null
               return (
                 <div key={item.title} className="px-8 py-2 short:py-0.5">
-                  {item.dropdown ? (
+                  {item.dropdown && itemKey ? (
                     <>
                       <button
                         onClick={() => toggleMobileDropdown(itemKey)}

@@ -3,11 +3,11 @@ import { getProjectBySlug } from '@/services/webflow/projects'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> | { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    // Handle both sync and async params (Next.js 15+ uses Promise)
-    const resolvedParams = params instanceof Promise ? await params : params
+    // Next.js 15+ params are always a Promise
+    const resolvedParams = await params
     const slug = resolvedParams.slug
     
     const project = await getProjectBySlug(slug)

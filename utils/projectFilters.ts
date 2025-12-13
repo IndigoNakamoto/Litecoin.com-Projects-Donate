@@ -43,9 +43,8 @@ export function isPastProject(project: Project): boolean {
 
 /**
  * Checks if a project should be hidden from display
- * Handles boolean true, string "true", and number 1
  */
 export function isHidden(project: Project): boolean {
-  return project.hidden === true || project.hidden === 'true' || project.hidden === 1
+  return project.hidden === true
 }
 

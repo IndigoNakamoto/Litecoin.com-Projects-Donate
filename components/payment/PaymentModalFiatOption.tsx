@@ -179,7 +179,7 @@ export default function PaymentModalFiatOption() {
         <input
           type="number"
           ref={inputRef}
-          className={`w-full appearance-none rounded-3xl border pl-8 pr-4 text-[14px] font-[600] 
+          className={`w-full appearance-none rounded-3xl border pl-8 pr-4 h-10 text-[14px] font-[600] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-moz-appearance]:textfield
       ${
         isCustomAmount
           ? !isBelowMin

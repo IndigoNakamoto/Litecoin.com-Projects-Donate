@@ -3,9 +3,7 @@
 // components/PaymentModalPersonalInfo.tsx
 
 import React, { useState, useEffect } from 'react'
-import { SiX } from 'react-icons/si'
 import { useDonation } from '@/contexts/DonationContext'
-import Image from 'next/image'
 import { countries } from '@/components/countries'
 import GradientButton from '@/components/ui/GradientButton'
 import Button from '@/components/ui/Button'
@@ -54,7 +52,6 @@ const PaymentModalPersonalInfo: React.FC<
   // Note: useSession removed as next-auth is not installed
   // If authentication is needed, install next-auth and uncomment:
   // const { data: session } = useSession()
-  const session = null // Placeholder - install next-auth to enable session
 
   const shouldShowAddressFields =
     (!donateAnonymously && state.selectedOption !== 'stock') ||
@@ -116,7 +113,7 @@ const PaymentModalPersonalInfo: React.FC<
     const newErrors: typeof errors = {}
 
     // Determine which fields need validation:
-    const fieldsToValidate: (keyof typeof formData)[] = []
+    const fieldsToValidate: (keyof typeof errors)[] = []
 
     // Email
     fieldsToValidate.push('receiptEmail')
@@ -441,7 +438,7 @@ const PaymentModalPersonalInfo: React.FC<
       } else {
         console.error(data.error)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting pledge:', error)
     } finally {
       setIsLoading(false)

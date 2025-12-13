@@ -2,7 +2,7 @@
 
 // /components/PaymentModalStockOption.tsx
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faExchange } from '@fortawesome/free-solid-svg-icons'
@@ -33,6 +33,37 @@ export default function PaymentModalStockOption() {
     {}
   )
 
+  const fetchTickerCost = useCallback(async (ticker: string) => {
+    try {
+      const response = await axios.get('/api/getTickerCost', {
+        params: { ticker },
+      })
+      const { rate } = response.data.data
+      setTickerCost(rate)
+      const minimumQuantity = Math.ceil(500 / rate)
+
+      const initialQuantity = formData.pledgeAmount
+        ? Number(formData.pledgeAmount)
+        : minimumQuantity
+
+      dispatch({
+        type: 'SET_FORM_DATA',
+        payload: { pledgeAmount: initialQuantity.toString() },
+      })
+      setUsdValue(Number((initialQuantity * rate).toFixed(2)))
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorResponse = (error as { response?: { data?: unknown } })?.response?.data
+      console.error(
+        'Error fetching ticker cost:',
+        errorResponse || errorMessage
+      )
+      setTickerCost(0)
+      setUsdValue(0)
+      dispatch({ type: 'SET_DONATE_BUTTON_DISABLED', payload: true })
+    }
+  }, [formData.pledgeAmount, dispatch])
+
   // Fetch ticker cost when formData.assetSymbol changes
   useEffect(() => {
     if (formData.assetSymbol && formData.assetSymbol !== 'USD') {
@@ -49,7 +80,7 @@ export default function PaymentModalStockOption() {
       setSearchTerm('')
       setShowDropdown(false)
     }
-  }, [formData.assetSymbol, formData.assetName])
+  }, [formData.assetSymbol, formData.assetName, fetchTickerCost])
 
   // Update USD value when pledgeAmount or tickerCost changes
   useEffect(() => {
@@ -114,10 +145,12 @@ export default function PaymentModalStockOption() {
         tickers,
         count: apiPagination.count,
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorResponse = (error as { response?: { data?: unknown } })?.response?.data
       console.error(
         'Error fetching stocks:',
-        error.response?.data || error.message
+        errorResponse || errorMessage
       )
       setFilteredStocks([])
     } finally {
@@ -138,35 +171,6 @@ export default function PaymentModalStockOption() {
       dispatch({ type: 'SET_DONATE_BUTTON_DISABLED', payload: true })
     }
   }, [formData.assetSymbol, formData.pledgeAmount, tickerCost, dispatch])
-
-  const fetchTickerCost = async (ticker: string) => {
-    try {
-      const response = await axios.get('/api/getTickerCost', {
-        params: { ticker },
-      })
-      const { rate } = response.data.data
-      setTickerCost(rate)
-      const minimumQuantity = Math.ceil(500 / rate)
-
-      const initialQuantity = formData.pledgeAmount
-        ? Number(formData.pledgeAmount)
-        : minimumQuantity
-
-      dispatch({
-        type: 'SET_FORM_DATA',
-        payload: { pledgeAmount: initialQuantity.toString() },
-      })
-      setUsdValue(Number((initialQuantity * rate).toFixed(2)))
-    } catch (error: any) {
-      console.error(
-        'Error fetching ticker cost:',
-        error.response?.data || error.message
-      )
-      setTickerCost(0)
-      setUsdValue(0)
-      dispatch({ type: 'SET_DONATE_BUTTON_DISABLED', payload: true })
-    }
-  }
 
   const handleStockSelect = (stock: Stock) => {
     const stockDisplayName = `${stock.name} (${stock.ticker})`
@@ -346,7 +350,7 @@ export default function PaymentModalStockOption() {
               </div>
               <input
                 type="number"
-                className="w-36 border-none bg-[#c6d3d6] text-center font-space-grotesk text-lg font-black"
+                className="w-36 border-none bg-[#c6d3d6] text-center font-space-grotesk text-lg font-black !text-[#222222]"
                 value={usdValue}
                 disabled
               />
