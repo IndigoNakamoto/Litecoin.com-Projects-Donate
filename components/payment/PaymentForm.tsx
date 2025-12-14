@@ -198,7 +198,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         )
       case 'thankYou':
         return (
-          <PaymentModalStockDonorThankYou onRequestClose={handleRequestClose} />
+              <PaymentModalStockDonorThankYou />
         )
       case 'payment': // Explicitly handle 'payment' step
       default:

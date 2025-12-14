@@ -263,10 +263,28 @@ interface DonationProviderProps {
 export const DonationProvider: React.FC<DonationProviderProps> = ({
   children,
 }) => {
+  const isTerminalStep = (step: DonationState['currentStep']) =>
+    step === 'complete' || step === 'thankYou'
+
   const initializer = (initialValue: DonationState) => {
     if (typeof window !== 'undefined') {
       const savedState = localStorage.getItem('donationState')
-      return savedState ? JSON.parse(savedState) : initialValue
+      if (!savedState) return initialValue
+
+      try {
+        const parsed = JSON.parse(savedState) as DonationState
+
+        // Never rehydrate into a terminal "thank you" step; start fresh instead.
+        // This prevents the flow from getting stuck on refresh after a completed donation.
+        if (parsed?.currentStep && isTerminalStep(parsed.currentStep)) {
+          return initialValue
+        }
+
+        return parsed
+      } catch {
+        // Corrupt/invalid saved state: fall back to a fresh state
+        return initialValue
+      }
     }
     return initialValue
   }
@@ -278,6 +296,12 @@ export const DonationProvider: React.FC<DonationProviderProps> = ({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Don't persist terminal states; otherwise refresh will re-open the thank-you step.
+      if (isTerminalStep(state.currentStep)) {
+        localStorage.removeItem('donationState')
+        return
+      }
+
       localStorage.setItem('donationState', JSON.stringify(state))
     }
   }, [state])

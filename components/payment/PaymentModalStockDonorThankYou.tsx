@@ -3,41 +3,29 @@
 // /components/PaymentModalStockDonorThankYou
 import React from 'react'
 import { useDonation } from '@/contexts/DonationContext'
+import GradientButton from '@/components/ui/GradientButton'
 
-interface PaymentModalStockDonorThankYouProps {
-  onRequestClose?: () => void
-}
-
-export default function PaymentModalStockDonorThankYou({
-  onRequestClose,
-}: PaymentModalStockDonorThankYouProps) {
-  const { state } = useDonation()
+export default function PaymentModalStockDonorThankYou() {
+  const { state, dispatch } = useDonation()
 
   // Extract necessary details from the state
   const projectTitle = state.projectTitle || 'your selected project'
   const donatedStock = state.formData.assetSymbol || 'N/A'
   const stockQuantity = state.formData.pledgeAmount || '0'
-  const donorName = state.formData.isAnonymous
-    ? 'Anonymous Donor'
-    : `${state.formData.firstName} ${state.formData.lastName}`
   const brokerName = state.formData.brokerLabelName || 'N/A'
-  const brokerContactName = state.formData.brokerContactName || 'N/A'
   const brokerageAccountNumber = state.formData.brokerageAccountNumber || 'N/A'
-  const signatureImage = state.formData.signatureImage || ''
 
-  // Format the signature date
-  const signatureDate = state.formData.signatureDate
-    ? new Date(state.formData.signatureDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : 'Pending'
+  const handleMakeAnotherDonation = () => {
+    dispatch({ type: 'RESET_DONATION_STATE' })
+    // Do NOT call onRequestClose; we want to go back to the start of the PaymentForm flow.
+  }
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center justify-center space-y-6 rounded-lg p-0 md:p-8">
-      <h2 className="text-[30px] font-[600] !text-[#222222]">Thank You for Your Donation!</h2>
-      <hr className="border-t-1 w-full border-gray-400" />
+      <h2 className="text-[30px] font-semibold text-[#222222]!">
+        Thank You for Your Donation!
+      </h2>
+      <hr className="w-full border-t border-gray-400" />
       <div className="">
         <p className=" text-black">
           Your generous donation has been sent to your broker {brokerName} to
@@ -65,6 +53,15 @@ export default function PaymentModalStockDonorThankYou({
           </p>
         </p>
       </div>
+
+      <GradientButton
+        onClick={handleMakeAnotherDonation}
+        isLoading={false}
+        disabled={false}
+        type="button"
+      >
+        MAKE ANOTHER DONATION
+      </GradientButton>
     </div>
   )
 }

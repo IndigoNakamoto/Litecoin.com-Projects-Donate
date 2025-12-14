@@ -9,23 +9,21 @@ type ThankYouModalProps = {
   onRequestClose?: () => void
 }
 
-const PaymentModalFiatThankYou: React.FC<ThankYouModalProps> = ({
-  onRequestClose,
-}) => {
+const PaymentModalFiatThankYou: React.FC<ThankYouModalProps> = () => {
   const { state, dispatch } = useDonation()
   const projectTitle = state.projectTitle || 'your selected project'
 
-  const handleBack = () => {
+  const handleMakeAnotherDonation = () => {
     dispatch({ type: 'RESET_DONATION_STATE' })
     // Do NOT call onRequestClose to keep the modal open and render initial step
   }
 
   return (
     <div className="mx-auto flex max-w-md flex-col  space-y-6 rounded-lg p-8">
-      <h2 className="font-space-grotesk text-[30px] font-bold !text-[#222222]">
+      <h2 className="font-space-grotesk text-[30px] font-bold text-[#222222]!">
         Thank You for Your Donation!
       </h2>
-      <hr className="border-t-1 w-full border-gray-400" />
+      <hr className="w-full border-t border-gray-400" />
       <p className="mt-4 text-[16px] text-[#222222]">
         Your generous donation to {projectTitle} has been successfully
         processed. We appreciate your support!
@@ -46,13 +44,13 @@ const PaymentModalFiatThankYou: React.FC<ThankYouModalProps> = ({
       </p>
       {/* Back Button using GradientButton */}
       <GradientButton
-        onClick={handleBack}
+        onClick={handleMakeAnotherDonation}
         isLoading={false}
         disabled={false}
         loadingText="Going Back..."
         type="button"
       >
-        BACK
+        MAKE ANOTHER DONATION
       </GradientButton>
     </div>
   )
