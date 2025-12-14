@@ -4,6 +4,7 @@ import { getPostsByProjectSlug, type Post } from '@/services/webflow/posts'
 import { getUpdatesByProjectSlug, type Update } from '@/services/webflow/updates'
 import { notFound } from 'next/navigation'
 import ProjectDetailClient from '@/components/projects/ProjectDetailClient'
+import { Suspense } from 'react'
 
 export default async function ProjectPage({
   params,
@@ -54,13 +55,16 @@ export default async function ProjectPage({
   }
 
   return (
-    <ProjectDetailClient
-      project={project}
-      addressStats={addressStats}
-      faqs={faqs}
-      updates={updates}
-      posts={posts}
-    />
+    // ProjectDetailClient uses useSearchParams(), which requires a Suspense boundary in Next.js.
+    <Suspense fallback={null}>
+      <ProjectDetailClient
+        project={project}
+        addressStats={addressStats}
+        faqs={faqs}
+        updates={updates}
+        posts={posts}
+      />
+    </Suspense>
   )
 }
 
