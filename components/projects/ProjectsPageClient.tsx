@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useDonation } from '@/contexts/DonationContext'
 import { Project } from '@/types/project'
 import { useProjectFiltering } from '@/hooks/useProjectFiltering'
@@ -19,15 +20,26 @@ type ProjectsPageClientProps = {
   projects: Project[]
 }
 
+// Dynamically import PaymentModal to avoid SSR issues (react-modal)
+const PaymentModal = dynamic(() => import('../payment/PaymentModal'), {
+  ssr: false,
+})
+
 export default function ProjectsPageClient({ projects }: ProjectsPageClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { dispatch } = useDonation()
   const { openSourceProjects, completedProjects, openBounties } = useProjectFiltering(projects)
+
+  // Modal state (Foundation-only on this page)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<Project | undefined>(undefined)
 
   const projectsRef = useRef<HTMLDivElement>(null)
   const bountiesRef = useRef<HTMLDivElement>(null)
 
-  const openPaymentModal = useCallback((project: Project = LITECOIN_FOUNDATION_PROJECT) => {
+  const openPaymentModal = useCallback((_project?: Project) => {
+    const project = LITECOIN_FOUNDATION_PROJECT
     dispatch({
       type: 'SET_PROJECT_DETAILS',
       payload: {
@@ -36,8 +48,40 @@ export default function ProjectsPageClient({ projects }: ProjectsPageClientProps
         image: project.coverImage || '',
       },
     })
-    router.push(`/projects?modal=true`)
+    router.push('/projects?modal=true')
   }, [dispatch, router])
+
+  const closeModal = useCallback(() => {
+    setModalOpen(false)
+    dispatch({ type: 'RESET_DONATION_STATE' })
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('modal')
+    const newQuery = params.toString()
+    const newUrl = newQuery ? `/projects?${newQuery}` : '/projects'
+    router.push(newUrl, { scroll: false })
+  }, [dispatch, router, searchParams])
+
+  // Open/close modal based on query params (Foundation-only)
+  useEffect(() => {
+    const modal = searchParams.get('modal')
+    if (modal === 'true') {
+      const project = LITECOIN_FOUNDATION_PROJECT
+      setSelectedProject(project)
+      setModalOpen(true)
+
+      dispatch({
+        type: 'SET_PROJECT_DETAILS',
+        payload: {
+          slug: project.slug,
+          title: project.name,
+          image: project.coverImage || '',
+        },
+      })
+    } else {
+      setModalOpen(false)
+    }
+  }, [dispatch, searchParams])
 
   const bgColors = useMemo(() => [...BOUNTY_BG_COLORS], [])
 
@@ -91,6 +135,13 @@ export default function ProjectsPageClient({ projects }: ProjectsPageClientProps
       )}
 
       <DevelopmentPortalSection />
+
+      {/* Donation modal (Litecoin Foundation only) */}
+      <PaymentModal
+        isOpen={modalOpen}
+        onRequestClose={closeModal}
+        project={selectedProject}
+      />
     </div>
   )
 }

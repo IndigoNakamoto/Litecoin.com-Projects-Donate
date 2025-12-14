@@ -1,7 +1,7 @@
 'use client'
 
 // components/PaymentForm.tsx
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Image from 'next/image'
 import { customImageLoader } from '@/utils/customImageLoader'
 import GradientButton from '@/components/ui/GradientButton'
@@ -24,6 +24,27 @@ import Button from '@/components/ui/Button'
 import { Project } from '@/types/project'
 import { useDonation } from '@/contexts/DonationContext'
 
+/**
+ * Render a 3rd-party HTML snippet without React repeatedly re-writing `innerHTML`
+ * on every parent re-render (which can break externally attached event handlers).
+ */
+const HtmlSnippet = React.memo(function HtmlSnippet({
+  html,
+  className,
+}: {
+  html: string
+  className?: string
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    containerRef.current.innerHTML = html || ''
+  }, [html])
+
+  return <div ref={containerRef} className={className} />
+})
+
 type PaymentFormProps = {
   project: Project | undefined
   onRequestClose?: () => void
@@ -40,13 +61,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const [widgetSnippet, setWidgetSnippet] = useState('')
   const [widgetError, setWidgetError] = useState('')
   const [isMounted, setIsMounted] = useState(false)
+  const widgetScriptInjectedRef = useRef(false)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
   useEffect(() => {
-    if (project?.slug === 'litecoin-foundation') {
+    if (project?.slug === 'litecoin-foundation' && !widgetSnippet) {
       const fetchWidgetSnippet = async () => {
         try {
           const res = await fetch('/api/getWidgetSnippet')
@@ -63,17 +85,23 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           setWidgetSnippet(data.popup)
 
           // Parse and execute the script manually
-          const parser = new DOMParser()
-          const doc = parser.parseFromString(data.popup, 'text/html')
-          const script = doc.querySelector('script')
+          // Important: We inject the script only once, to avoid re-initializing the
+          // widget and/or losing click handlers when React re-renders.
+          if (!widgetScriptInjectedRef.current) {
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(data.popup, 'text/html')
+            const script = doc.querySelector('script')
 
-          if (script) {
-            const existingScript = document.getElementById(script.id)
-            if (!existingScript) {
-              const newScript = document.createElement('script')
-              newScript.id = script.id
-              newScript.innerHTML = script.innerHTML
-              document.body.appendChild(newScript)
+            if (script) {
+              const scriptId = script.getAttribute('id') || 'tgb-widget-script'
+              const existingScript = document.getElementById(scriptId)
+              if (!existingScript) {
+                const newScript = document.createElement('script')
+                newScript.id = scriptId
+                newScript.innerHTML = script.innerHTML
+                document.body.appendChild(newScript)
+              }
+              widgetScriptInjectedRef.current = true
             }
           }
         } catch (error: any) {
@@ -85,7 +113,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
       fetchWidgetSnippet()
     }
-  }, [project])
+  }, [project?.slug, widgetSnippet])
 
   useEffect(() => {
     if (project) {
@@ -268,11 +296,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   {/* Second Row: widgetSnippet and Stock Button */}
                   <div className="flex justify-between space-x-3">
                     <div className="w-1/2">
-                      <div className="flex w-full flex-row items-center justify-center gap-2 rounded-3xl border border-[#222222] text-xl font-bold">
-                        <div
-                          dangerouslySetInnerHTML={{ __html: widgetSnippet }}
-                          className="h-full w-full"
-                        />
+                      <div className="flex h-12 w-full flex-row items-center justify-center gap-2 overflow-hidden rounded-3xl border border-[#222222] bg-transparent text-xl font-bold [&_button]:h-full [&_button]:w-full [&_button]:flex [&_button]:items-center [&_button]:justify-center">
+                        <HtmlSnippet html={widgetSnippet} className="h-full w-full" />
                       </div>
                     </div>
 
@@ -345,7 +370,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     !widgetError &&
                     widgetSnippet ? (
                       <div className="w-1/2">
-                        <div className="flex w-full flex-row items-center justify-center gap-2 rounded-3xl border border-[#222222] text-xl font-bold">
+                        <div className="flex h-12 w-full flex-row items-center justify-center gap-2 overflow-hidden rounded-3xl border border-[#222222] bg-transparent text-xl font-bold [&_button]:h-full [&_button]:w-full [&_button]:flex [&_button]:items-center [&_button]:justify-center">
                           <div
                             dangerouslySetInnerHTML={{ __html: widgetSnippet }}
                           />

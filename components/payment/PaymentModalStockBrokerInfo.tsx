@@ -12,7 +12,6 @@ export default function PaymentModalStockBrokerInfo() {
   const { state, dispatch } = useDonation()
 
   type Broker = {
-    id: string
     name: string
     label: string
   }
@@ -115,7 +114,10 @@ export default function PaymentModalStockBrokerInfo() {
         Broker Information
       </h2>
       {error && <p className="text-red-500">{error}</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4 rounded-lg p-4"
+      >
         <div>
           <label htmlFor="broker-firm" className="text-[16px] text-[#000]">
             Delivering Broker Firm<span className="text-red-600">*</span>
@@ -125,11 +127,11 @@ export default function PaymentModalStockBrokerInfo() {
             value={selectedBroker}
             onChange={handleBrokerChange}
             required
-            className="w-full rounded-lg border-[#222222] bg-[#f0f0f0] p-2"
+            className="w-full rounded-lg border border-[#222222]  bg-[#f0f0f0] p-2"
           >
             <option value="">Select a broker</option>
             {brokers.map((broker) => (
-              <option key={broker.id} value={broker.name}>
+              <option key={broker.name} value={broker.name}>
                 {broker.label}
               </option>
             ))}
@@ -148,7 +150,7 @@ export default function PaymentModalStockBrokerInfo() {
             value={brokerageAccountNumber}
             onChange={(e) => setbrokerageAccountNumber(e.target.value)}
             required
-            className="w-full rounded-lg border-[#222222] bg-[#f0f0f0] p-2"
+            className="w-full rounded-lg border border-[#222222]  bg-[#f0f0f0] p-2"
           />
         </div>
         <div>
@@ -163,7 +165,7 @@ export default function PaymentModalStockBrokerInfo() {
             type="text"
             value={brokerContactName}
             onChange={(e) => setBrokerContactName(e.target.value)}
-            className="w-full rounded-lg border-[#222222] bg-[#f0f0f0] p-2"
+            className="w-full rounded-lg border border-[#222222]  bg-[#f0f0f0] p-2"
           />
         </div>
         <div>
@@ -175,7 +177,7 @@ export default function PaymentModalStockBrokerInfo() {
             type="email"
             value={brokerEmail}
             onChange={(e) => setBrokerEmail(e.target.value)}
-            className="w-full rounded-lg border-[#222222] bg-[#f0f0f0] p-2"
+            className="w-full rounded-lg border border-[#222222]  bg-[#f0f0f0] p-2"
           />
         </div>
         <div>
@@ -187,7 +189,7 @@ export default function PaymentModalStockBrokerInfo() {
             type="tel"
             value={brokerPhone}
             onChange={(e) => setBrokerPhone(e.target.value)}
-            className="w-full rounded-lg border-[#222222] bg-[#f0f0f0] p-2"
+            className="w-full rounded-lg border border-[#222222]  bg-[#f0f0f0] !text-[#222222] p-2"
           />
         </div>
         <div className="flex justify-between space-x-2 pt-8 !font-space-grotesk !text-xl">

@@ -10,8 +10,8 @@ import SectionGrey from '@/components/ui/SectionGrey'
 import SectionStats from '@/components/ui/SectionStats'
 import CompletedProjects from '@/components/ui/CompletedProjects'
 import { useDonation } from '@/contexts/DonationContext'
-// TODO: Import PaymentForm when it's migrated
-// import PaymentForm from '@/components/PaymentForm'
+import PaymentForm from '@/components/payment/PaymentForm'
+import { Project } from '@/types/project'
 
 function ResetHandler() {
   const { dispatch } = useDonation()
@@ -33,6 +33,35 @@ function ResetHandler() {
 }
 
 function DonatePageContent() {
+  const litecoinFoundationProject: Project = {
+    id: 'litecoin-foundation',
+    name: 'Litecoin Foundation',
+    slug: 'litecoin-foundation',
+    summary: '',
+    content: '',
+    coverImage: '/static/images/projects/Litecoin_Foundation_Project.png',
+    status: 'active',
+    projectType: 'foundation',
+    hidden: false,
+    recurring: false,
+    totalPaid: 0,
+    serviceFeesCollected: 0,
+    website: '',
+    github: '',
+    twitter: '',
+    discord: '',
+    telegram: '',
+    reddit: '',
+    facebook: '',
+    lastPublished: '',
+    lastUpdated: '',
+    createdOn: '',
+    bitcoinContributors: [],
+    litecoinContributors: [],
+    advocates: [],
+    litecoinRaised: 0,
+    litecoinPaid: 0,
+  }
 
   return (
     <>
@@ -50,7 +79,7 @@ function DonatePageContent() {
               </p>
               <p className="mt-4 text-lg text-[#222222]">
                 Since Litecoin is a fairly launched, decentralized
-                cryptocurrency, Litecoin Foundation's primary source of
+                cryptocurrency, Litecoin Foundation&apos;s primary source of
                 financial support is through individual donations. Your
                 contribution helps Litecoin Foundation continue to fund research
                 and development, education, community support, partnerships and
@@ -60,21 +89,13 @@ function DonatePageContent() {
               <p className="mt-4 text-lg text-[#222222]">
                 Your contribution may also reduce your taxable income, depending
                 on your tax situation. If you have any questions, please feel
-                free to consult with your tax advisor to ensure you're getting
+                free to consult with your tax advisor to ensure you&apos;re getting
                 the full benefit of your charitable donation.
               </p>
             </div>
           </div>
           <div className="mt-12 w-full max-w-[600px] flex-none rounded-2xl border border-[#222222] bg-gray-100 p-6 xl:mt-0">
-            {/* TODO: Add PaymentForm component when migrated */}
-            <div className="text-center p-8">
-              <p className="text-gray-600 mb-4">
-                Payment form will be available here once PaymentForm component is migrated.
-              </p>
-              <p className="text-sm text-gray-500">
-                For now, you can use the donation API endpoints directly.
-              </p>
-            </div>
+            <PaymentForm project={litecoinFoundationProject} modal={true} />
           </div>
         </div>
       </DonateSection>

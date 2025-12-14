@@ -656,7 +656,7 @@ const PaymentModalPersonalInfo: React.FC<
                   <ul
                     id="country-listbox"
                     role="listbox"
-                    className="absolute top-12 max-h-56 w-full overflow-y-auto rounded-lg border border-[#222222] bg-[#f0f0f0] text-[#000]"
+                    className="absolute top-12 max-h-56 w-full overflow-y-auto rounded-lg border border-[#222222] bg-[#f0f0f0] text-[#222222]"
                     style={{ zIndex: 10 }}
                   >
                     {filteredCountries.map((country, index) => (
@@ -665,7 +665,7 @@ const PaymentModalPersonalInfo: React.FC<
                         onClick={() => handleCountrySelect(country)}
                         role="option"
                         aria-selected={index === focusedCountryIndex}
-                        className={`flex w-full cursor-pointer items-center p-2 text-left text-[#000] ${
+                        className={`flex w-full cursor-pointer items-center p-2 text-left !text-[#222222] ${
                           index === focusedCountryIndex
                             ? 'bg-gray-400'
                             : 'hover:bg-gray-200'

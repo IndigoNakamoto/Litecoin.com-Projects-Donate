@@ -22,7 +22,7 @@ const PaymentModalFiatThankYou: React.FC<ThankYouModalProps> = ({
 
   return (
     <div className="mx-auto flex max-w-md flex-col  space-y-6 rounded-lg p-8">
-      <h2 className="font-space-grotesk text-[30px] font-bold text-[#222222]">
+      <h2 className="font-space-grotesk text-[30px] font-bold !text-[#222222]">
         Thank You for Your Donation!
       </h2>
       <hr className="border-t-1 w-full border-gray-400" />
