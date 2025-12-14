@@ -1,6 +1,6 @@
 # Litecoin Fund
 
-A clean, modern Next.js application for managing Litecoin open-source projects and donations.
+A Next.js application powering the public **`litecoin.com/projects`** and **`litecoin.com/donate`** pages, plus supporting API routes for projects + donations.
 
 ## Features
 
@@ -35,19 +35,15 @@ A clean, modern Next.js application for managing Litecoin open-source projects a
    ```
 
 2. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
-   
-   Fill in your credentials:
-   - Webflow API token and collection ID
-   - The Giving Block login credentials
-   - Vercel KV credentials
-   - Database URL (for Prisma)
+   - Create a `.env` file (this repo expects `.env` at runtime, as shown in `next build` output).
+   - Provide:
+     - Webflow API token / collection IDs
+     - The Giving Block credentials
+     - KV credentials (if used)
+     - `DATABASE_URL` (points at the legacy production DB if you want exact parity)
 
 3. **Set up Prisma** (after upgrading Node.js)
    ```bash
-   npx prisma init
    npx prisma generate
    ```
 
@@ -58,19 +54,40 @@ A clean, modern Next.js application for managing Litecoin open-source projects a
 
 ## API Routes
 
+This list reflects the routes produced by `next build` (App Router).
+
 ### Webflow
 - `GET /api/webflow/projects` - Get all published projects
 - `GET /api/webflow/projects/[slug]` - Get project by slug
 
 ### The Giving Block
-- `POST /api/tgb/donations/fiat` - Create fiat donation pledge
-- `POST /api/tgb/donations/crypto` - Create crypto donation (deposit address)
+- **Legacy-parity donation endpoints (used by the donation UI)**
+  - `POST /api/createFiatDonationPledge`
+  - `POST /api/chargeFiatDonationPledge`
+  - `POST /api/createDepositAddress`
+  - `POST /api/createStockDonationPledge`
+  - `POST /api/submitStockDonation`
+  - `POST /api/signStockDonation`
+- **TGB proxy endpoints**
+  - `POST /api/tgb/donations/fiat`
+  - `POST /api/tgb/donations/crypto`
+
+### Other APIs
+- `GET /api/stats`
+- `GET /api/getInfoTGB?slug=...`
+- `GET /api/getWidgetSnippet`
+- `GET /api/matching-donors-by-project?slug=...`
+- `GET /api/contributors`
 
 ## Pages
 
-- `/projects` - List all projects
-- `/projects/[slug]` - Individual project page
-- `/donate` - Donation form
+These correspond to the public site routes:
+
+- **`/projects`** → **`litecoin.com/projects`** (project list + donation modal)
+- **`/projects/[slug]`** → **`litecoin.com/projects/:slug`** (project detail + donation modal)
+- **`/donate`** → **`litecoin.com/donate`** (donation page)
+- `/projects/submit` (project submission form)
+- `/projects/submitted` (submission confirmation)
 
 ## Environment Variables
 
