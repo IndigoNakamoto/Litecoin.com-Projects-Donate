@@ -1,4 +1,4 @@
-import { getAllPublishedProjects } from '@/services/webflow/projects'
+import { getAllPublishedProjects } from '@/services/cms/projects'
 import ProjectsPageClient from '@/components/projects/ProjectsPageClient'
 import { Suspense } from 'react'
 

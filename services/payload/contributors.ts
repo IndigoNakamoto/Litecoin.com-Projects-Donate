@@ -1,7 +1,8 @@
 import { kv } from '@/lib/kv'
-import { createPayloadClient, fetchAllPages } from './client'
+import { createPayloadClient, fetchAllPages, resolvePayloadAssetUrl } from './client'
 import type { PayloadContributor } from './types'
 import type { Contributor } from '@/types/project'
+import { toAppID } from './id'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -10,12 +11,12 @@ const CACHE_TTL = 259200 // 3 days in seconds
  */
 function transformContributor(payloadContributor: PayloadContributor): Contributor {
   const profilePicture = payloadContributor.profilePicture
-  const avatarUrl = typeof profilePicture === 'string' 
-    ? profilePicture 
-    : profilePicture?.url
+  const avatarUrl = resolvePayloadAssetUrl(
+    typeof profilePicture === 'object' && profilePicture ? profilePicture.url : undefined
+  )
 
   return {
-    id: payloadContributor.id,
+    id: toAppID(payloadContributor.id),
     name: payloadContributor.name,
     slug: payloadContributor.slug,
     avatar: avatarUrl,

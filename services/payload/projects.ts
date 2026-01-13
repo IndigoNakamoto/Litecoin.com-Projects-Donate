@@ -1,8 +1,9 @@
 import { kv } from '@/lib/kv'
-import { createPayloadClient, fetchAllPages } from './client'
+import { createPayloadClient, fetchAllPages, resolvePayloadAssetUrl } from './client'
 import type { PayloadProject, PayloadContributor } from './types'
 import type { Project, Contributor } from '@/types/project'
 import { getContributorsByIds } from './contributors'
+import { toAppID } from './id'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -11,12 +12,12 @@ const CACHE_TTL = 259200 // 3 days in seconds
  */
 function transformContributor(payloadContributor: PayloadContributor): Contributor {
   const coverImage = payloadContributor.profilePicture
-  const avatarUrl = typeof coverImage === 'string' 
-    ? coverImage 
-    : coverImage?.url
+  const avatarUrl = resolvePayloadAssetUrl(
+    typeof coverImage === 'object' && coverImage ? coverImage.url : undefined
+  )
 
   return {
-    id: payloadContributor.id,
+    id: toAppID(payloadContributor.id),
     name: payloadContributor.name,
     slug: payloadContributor.slug,
     avatar: avatarUrl,
@@ -37,9 +38,9 @@ async function transformProject(
   resolveContributors: boolean = true
 ): Promise<Project> {
   const coverImage = payloadProject.coverImage
-  const coverImageUrl = typeof coverImage === 'string' 
-    ? coverImage 
-    : coverImage?.url
+  const coverImageUrl = resolvePayloadAssetUrl(
+    typeof coverImage === 'object' && coverImage ? coverImage.url : undefined
+  )
 
   let bitcoinContributors: Contributor[] | undefined
   let litecoinContributors: Contributor[] | undefined
@@ -49,23 +50,26 @@ async function transformProject(
     // Resolve contributor relationships
     const bitcoinIds = Array.isArray(payloadProject.bitcoinContributors)
       ? payloadProject.bitcoinContributors
-          .filter((c): c is string => typeof c === 'string')
+          .filter((c): c is number => typeof c === 'number')
+          .map(toAppID)
       : []
     
     const litecoinIds = Array.isArray(payloadProject.litecoinContributors)
       ? payloadProject.litecoinContributors
-          .filter((c): c is string => typeof c === 'string')
+          .filter((c): c is number => typeof c === 'number')
+          .map(toAppID)
       : []
     
     const advocateIds = Array.isArray(payloadProject.advocates)
       ? payloadProject.advocates
-          .filter((c): c is string => typeof c === 'string')
+          .filter((c): c is number => typeof c === 'number')
+          .map(toAppID)
       : []
 
     // If contributors are already populated, use them directly
     if (payloadProject.bitcoinContributors && 
         payloadProject.bitcoinContributors.length > 0 &&
-        typeof payloadProject.bitcoinContributors[0] !== 'string') {
+        typeof payloadProject.bitcoinContributors[0] !== 'number') {
       bitcoinContributors = (payloadProject.bitcoinContributors as PayloadContributor[])
         .map(transformContributor)
     } else if (bitcoinIds.length > 0) {
@@ -74,7 +78,7 @@ async function transformProject(
 
     if (payloadProject.litecoinContributors && 
         payloadProject.litecoinContributors.length > 0 &&
-        typeof payloadProject.litecoinContributors[0] !== 'string') {
+        typeof payloadProject.litecoinContributors[0] !== 'number') {
       litecoinContributors = (payloadProject.litecoinContributors as PayloadContributor[])
         .map(transformContributor)
     } else if (litecoinIds.length > 0) {
@@ -83,7 +87,7 @@ async function transformProject(
 
     if (payloadProject.advocates && 
         payloadProject.advocates.length > 0 &&
-        typeof payloadProject.advocates[0] !== 'string') {
+        typeof payloadProject.advocates[0] !== 'number') {
       advocates = (payloadProject.advocates as PayloadContributor[])
         .map(transformContributor)
     } else if (advocateIds.length > 0) {
@@ -92,11 +96,13 @@ async function transformProject(
   }
 
   return {
-    id: payloadProject.id,
+    id: toAppID(payloadProject.id),
     name: payloadProject.name,
     slug: payloadProject.slug,
     summary: payloadProject.summary,
-    content: payloadProject.content,
+    content: typeof payloadProject.content === 'string'
+      ? payloadProject.content
+      : JSON.stringify(payloadProject.content),
     coverImage: coverImageUrl,
     status: payloadProject.status,
     projectType: payloadProject.projectType,
@@ -139,7 +145,12 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
   try {
     cached = await kv.get<Project[]>(cacheKey)
     if (cached) {
-      return cached
+      // If any cached slugs look like Webflow IDs (24-hex), refresh. This happens if
+      // an older migration incorrectly stored `slug` as the Webflow item ID.
+      const hasLegacySlug = cached.some((p) => /^[0-9a-f]{24}$/i.test(p.slug))
+      const hasRelativeMedia = cached.some((p) => typeof p.coverImage === 'string' && p.coverImage.startsWith('/'))
+      if (!hasLegacySlug && !hasRelativeMedia) return cached
+      console.warn('[payload:getAllPublishedProjects] Detected legacy cache (slug/media); refreshing')
     }
   } catch (error) {
     // KV not available, continue

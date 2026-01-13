@@ -3,13 +3,13 @@
  */
 
 export interface PayloadProject {
-  id: string
+  id: number
   name: string
   slug: string
   summary: string
-  content?: string
-  coverImage?: string | {
-    id: string
+  content?: unknown
+  coverImage?: number | {
+    id: number
     url: string
     alt?: string
   }
@@ -26,20 +26,20 @@ export interface PayloadProject {
   telegram?: string
   reddit?: string
   facebook?: string
-  bitcoinContributors?: string[] | PayloadContributor[]
-  litecoinContributors?: string[] | PayloadContributor[]
-  advocates?: string[] | PayloadContributor[]
+  bitcoinContributors?: number[] | PayloadContributor[]
+  litecoinContributors?: number[] | PayloadContributor[]
+  advocates?: number[] | PayloadContributor[]
   hashtags?: Array<{ tag: string }>
   createdAt: string
   updatedAt: string
 }
 
 export interface PayloadContributor {
-  id: string
+  id: number
   name: string
   slug: string
-  profilePicture?: string | {
-    id: string
+  profilePicture?: number | {
+    id: number
     url: string
     alt?: string
   }
@@ -54,10 +54,10 @@ export interface PayloadContributor {
 }
 
 export interface PayloadFAQ {
-  id: string
+  id: number
   question: string
-  answer: string
-  project: string | PayloadProject
+  answer: unknown
+  project: number | PayloadProject
   order?: number
   category?: string
   createdAt: string
@@ -65,21 +65,21 @@ export interface PayloadFAQ {
 }
 
 export interface PayloadPost {
-  id: string
+  id: number
   xPostLink?: string
   youtubeLink?: string
   redditLink?: string
-  projects?: string[] | PayloadProject[]
+  projects?: number[] | PayloadProject[]
   createdAt: string
   updatedAt: string
 }
 
 export interface PayloadUpdate {
-  id: string
+  id: number
   title: string
   summary?: string
-  content?: string
-  project: string | PayloadProject
+  content?: unknown
+  project: number | PayloadProject
   date: string
   authorTwitterHandle?: string
   tags?: Array<{ tag: string }>

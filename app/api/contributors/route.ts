@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAllActiveContributors } from '@/services/webflow/contributors'
+import { getAllActiveContributors } from '@/services/cms/contributors'
 
 export async function GET() {
   try {

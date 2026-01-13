@@ -52,43 +52,82 @@ function PaymentModalFiatDonate() {
   )
 
   useEffect(() => {
+    // Check if we're on HTTPS (required for live keys)
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    
     const initializeShift4 = () => {
       if (shift4Initialized.current) return
 
       const Shift4 = (window as any).Shift4
       if (Shift4) {
-        const shift4 = new Shift4('pk_live_sln6bKZqi6a0LzzhVZhK58HK')
+        // Wait for form ref to be available with retry limit
+        let retryCount = 0
+        const maxRetries = 20
+        const tryMount = () => {
+          if (formRef.current) {
+            try {
+              const shift4 = new Shift4('pk_live_sln6bKZqi6a0LzzhVZhK58HK')
 
-        const components = shift4
-          .createComponentGroup()
-          .automount(formRef.current)
+              const components = shift4
+                .createComponentGroup()
+                .automount(formRef.current)
 
-        shift4Ref.current = shift4
-        componentsRef.current = components
-        shift4Initialized.current = true
+              shift4Ref.current = shift4
+              componentsRef.current = components
+              shift4Initialized.current = true
+            } catch (error: any) {
+              console.error('Error initializing Shift4:', error)
+              // Show user-friendly error message
+              if (error?.message?.includes('https protocol')) {
+                setNotification('Payment form requires HTTPS. Please access this page over HTTPS.')
+              }
+            }
+          } else if (retryCount < maxRetries) {
+            retryCount++
+            setTimeout(tryMount, 50)
+          } else {
+            console.error('Form ref not available after retries')
+          }
+        }
+        tryMount()
       } else {
         console.error('Shift4 is not available on window')
       }
     }
 
     const loadShift4Script = () => {
-      if (!shift4Initialized.current) {
-        const script = document.createElement('script')
-        script.src = 'https://js.dev.shift4.com/shift4.js'
-        script.async = true
-        script.onload = initializeShift4
-        script.onerror = () => console.error('Failed to load Shift4 script.')
-        document.body.appendChild(script)
+      if (shift4Initialized.current) return
 
-        return () => {
-          if (document.body.contains(script)) {
-            document.body.removeChild(script)
-          }
+      // Check if script already exists
+      const existingScript = document.querySelector(
+        'script[src="https://js.dev.shift4.com/shift4.js"]'
+      )
+      if (existingScript) {
+        if ((window as any).Shift4) {
+          initializeShift4()
+        } else {
+          existingScript.addEventListener('load', initializeShift4)
         }
+        return
       }
+
+      // Load the script
+      const script = document.createElement('script')
+      script.src = 'https://js.dev.shift4.com/shift4.js'
+      script.async = true
+      script.onload = initializeShift4
+      script.onerror = () => console.error('Failed to load Shift4 script.')
+      document.body.appendChild(script)
     }
 
-    loadShift4Script()
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      if ((window as any).Shift4) {
+        initializeShift4()
+      } else {
+        loadShift4Script()
+      }
+    })
   }, [])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

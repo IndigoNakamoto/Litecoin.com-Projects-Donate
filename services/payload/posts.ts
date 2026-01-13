@@ -3,6 +3,7 @@ import { createPayloadClient, fetchAllPages } from './client'
 import type { PayloadPost } from './types'
 import { getProjectBySlug } from './projects'
 import type { Post } from '@/services/webflow/posts'
+import { toAppID, toPayloadID } from './id'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -11,11 +12,11 @@ const CACHE_TTL = 259200 // 3 days in seconds
  */
 function transformPost(payloadPost: PayloadPost): Post {
   const projects = Array.isArray(payloadPost.projects)
-    ? payloadPost.projects.map((p) => typeof p === 'string' ? p : p.id)
+    ? payloadPost.projects.map((p) => typeof p === 'number' ? toAppID(p) : toAppID(p.id))
     : []
 
   return {
-    id: payloadPost.id,
+    id: toAppID(payloadPost.id),
     isDraft: false,
     isArchived: false,
     fieldData: {
@@ -74,7 +75,7 @@ export async function getPostsByProjectId(projectId: string): Promise<Post[]> {
       {
         where: {
           projects: {
-            contains: projectId,
+            contains: toPayloadID(projectId),
           },
         },
       }

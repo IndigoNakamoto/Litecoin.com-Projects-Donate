@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
-import { getAllPublishedProjects } from '@/services/webflow/projects'
+import { getAllPublishedProjects } from '@/services/cms/projects'
 
 export const runtime = 'nodejs'
 

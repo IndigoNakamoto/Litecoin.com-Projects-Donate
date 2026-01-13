@@ -3,6 +3,7 @@ import { createPayloadClient, fetchAllPages } from './client'
 import type { PayloadFAQ } from './types'
 import { getProjectBySlug } from './projects'
 import type { FAQItem } from '@/services/webflow/faqs'
+import { toAppID, toPayloadID } from './id'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -10,12 +11,12 @@ const CACHE_TTL = 259200 // 3 days in seconds
  * Transform Payload FAQ to our FAQItem type
  */
 function transformFAQ(payloadFAQ: PayloadFAQ): FAQItem {
-  const projectId = typeof payloadFAQ.project === 'string' 
-    ? payloadFAQ.project 
+  const projectId = typeof payloadFAQ.project === 'number'
+    ? payloadFAQ.project
     : payloadFAQ.project.id
 
   return {
-    id: payloadFAQ.id,
+    id: toAppID(payloadFAQ.id),
     isDraft: false, // Payload doesn't have draft status in the same way
     isArchived: false,
     fieldData: {
@@ -23,7 +24,7 @@ function transformFAQ(payloadFAQ: PayloadFAQ): FAQItem {
       answer: typeof payloadFAQ.answer === 'string' 
         ? payloadFAQ.answer 
         : JSON.stringify(payloadFAQ.answer), // Rich text content
-      project: projectId,
+      project: toAppID(projectId),
       order: payloadFAQ.order,
       category: payloadFAQ.category,
     },
@@ -77,7 +78,7 @@ export async function getFAQsByProjectId(projectId: string): Promise<FAQItem[]> 
       {
         where: {
           project: {
-            equals: projectId,
+            equals: toPayloadID(projectId),
           },
         },
       }

@@ -3,6 +3,7 @@ import { createPayloadClient, fetchAllPages } from './client'
 import type { PayloadUpdate } from './types'
 import { getProjectBySlug } from './projects'
 import type { Update } from '@/services/webflow/updates'
+import { toAppID, toPayloadID } from './id'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -10,12 +11,12 @@ const CACHE_TTL = 259200 // 3 days in seconds
  * Transform Payload Update to our Update type
  */
 function transformUpdate(payloadUpdate: PayloadUpdate): Update {
-  const projectId = typeof payloadUpdate.project === 'string' 
-    ? payloadUpdate.project 
+  const projectId = typeof payloadUpdate.project === 'number'
+    ? payloadUpdate.project
     : payloadUpdate.project.id
 
   return {
-    id: payloadUpdate.id,
+    id: toAppID(payloadUpdate.id),
     isDraft: false,
     isArchived: false,
     fieldData: {
@@ -25,7 +26,7 @@ function transformUpdate(payloadUpdate: PayloadUpdate): Update {
       content: typeof payloadUpdate.content === 'string' 
         ? payloadUpdate.content 
         : JSON.stringify(payloadUpdate.content), // Rich text content
-      project: projectId,
+      project: toAppID(projectId),
       createdOn: payloadUpdate.createdAt,
       date: payloadUpdate.date,
       authorTwitterHandle: payloadUpdate.authorTwitterHandle,
@@ -81,7 +82,7 @@ export async function getUpdatesByProjectId(projectId: string): Promise<Update[]
       {
         where: {
           project: {
-            equals: projectId,
+            equals: toPayloadID(projectId),
           },
         },
         sort: '-date', // Sort by date descending
