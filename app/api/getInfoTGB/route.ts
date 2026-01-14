@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       if (processedDonations && processedDonations.length > 0) {
         donations = processedDonations
         // Sum using valueAtDonationTimeUSD for precision
-        totalAmount = processedDonations.reduce((acc, donation) => {
+        totalAmount = processedDonations.reduce((acc: Decimal, donation) => {
           const donationAmount = donation.valueAtDonationTimeUSD
             ? new Decimal(donation.valueAtDonationTimeUSD.toString() || '0')
             : new Decimal(0)
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
       donations = pledges
       // Sum using Decimal for precision
-      totalAmount = pledges.reduce((acc, donation) => {
+      totalAmount = pledges.reduce((acc: Decimal, donation) => {
         const donationAmount = donation.pledgeAmount
           ? new Decimal(donation.pledgeAmount.toString() || '0')
           : new Decimal(0)
