@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
 import { getAllPublishedProjects } from '@/services/cms/projects'
+import { Project } from '@/types/project'
 
 export const runtime = 'nodejs'
 
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     const projects = await getAllPublishedProjects()
 
     // Calculate total paid from projects
-    const totalPaid = projects.reduce((acc, project) => {
+    const totalPaid = projects.reduce((acc: number, project: Project) => {
       const paid = project.totalPaid || 0
       return acc + (typeof paid === 'number' ? paid : 0)
     }, 0)
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
             WHERE table_schema = 'public'
             ORDER BY table_name
           `
-          debugInfo.tables = tables.map((t) => t.table_name)
+          debugInfo.tables = tables.map((t: { table_name: string }) => t.table_name)
         } catch (e) {
           ;(debugInfo.errors as unknown[]).push({
             where: 'information_schema.tables',
