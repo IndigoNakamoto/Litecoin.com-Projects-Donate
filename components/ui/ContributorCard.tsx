@@ -151,6 +151,7 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, backgrou
         <div className="flex flex-col items-center">
           {contributor.avatar ? (
             <Image
+              loader={customImageLoader}
               src={contributor.avatar}
               alt={contributor.name}
               className="mb-4 h-32 w-32 rounded-full object-cover"

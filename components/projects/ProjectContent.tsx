@@ -128,7 +128,7 @@ const ProjectContent: React.FC<ProjectContentProps> = ({
           </div>
         </div>
       </div>
-      {content && (
+      {content && content.trim() && (
         <div className="markdown" dangerouslySetInnerHTML={{ __html: content }} />
       )}
       <ProjectContributors

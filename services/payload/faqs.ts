@@ -4,6 +4,7 @@ import type { PayloadFAQ } from './types'
 import { getProjectBySlug } from './projects'
 import type { FAQItem } from '@/services/webflow/faqs'
 import { toAppID, toPayloadID } from './id'
+import { lexicalToHtml } from '@/utils/lexicalToHtml'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -21,9 +22,7 @@ function transformFAQ(payloadFAQ: PayloadFAQ): FAQItem {
     isArchived: false,
     fieldData: {
       question: payloadFAQ.question,
-      answer: typeof payloadFAQ.answer === 'string' 
-        ? payloadFAQ.answer 
-        : JSON.stringify(payloadFAQ.answer), // Rich text content
+      answer: lexicalToHtml(payloadFAQ.answer), // Rich text content converted to HTML
       project: toAppID(projectId),
       order: payloadFAQ.order,
       category: payloadFAQ.category,

@@ -4,6 +4,7 @@ import type { PayloadProject, PayloadContributor } from './types'
 import type { Project, Contributor } from '@/types/project'
 import { getContributorsByIds } from './contributors'
 import { toAppID } from './id'
+import { lexicalToHtml } from '@/utils/lexicalToHtml'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -11,10 +12,18 @@ const CACHE_TTL = 259200 // 3 days in seconds
  * Transform Payload contributor to our Contributor type
  */
 function transformContributor(payloadContributor: PayloadContributor): Contributor {
-  const coverImage = payloadContributor.profilePicture
-  const avatarUrl = resolvePayloadAssetUrl(
-    typeof coverImage === 'object' && coverImage ? coverImage.url : undefined
-  )
+  const profilePicture = payloadContributor.profilePicture
+  let avatarUrl: string | undefined
+  
+  // Handle profilePicture - it can be a number (ID), an object with url, or undefined
+  if (typeof profilePicture === 'object' && profilePicture && 'url' in profilePicture) {
+    avatarUrl = resolvePayloadAssetUrl(profilePicture.url)
+  } else if (typeof profilePicture === 'number') {
+    // If it's just an ID, we can't resolve it here - would need another API call
+    // For now, set to undefined - the image won't load but at least won't break
+    console.warn(`[transformContributor] Contributor ${payloadContributor.id} has profilePicture as ID (${profilePicture}), not populated. Need depth > 1 for nested media.`)
+    avatarUrl = undefined
+  }
 
   return {
     id: toAppID(payloadContributor.id),
@@ -100,9 +109,7 @@ async function transformProject(
     name: payloadProject.name,
     slug: payloadProject.slug,
     summary: payloadProject.summary,
-    content: typeof payloadProject.content === 'string'
-      ? payloadProject.content
-      : JSON.stringify(payloadProject.content),
+    content: lexicalToHtml(payloadProject.content),
     coverImage: coverImageUrl,
     status: payloadProject.status,
     projectType: payloadProject.projectType,
@@ -136,25 +143,41 @@ async function transformProject(
  * Get all published (non-hidden) projects from Payload CMS
  */
 export async function getAllPublishedProjects(): Promise<Project[]> {
+  console.log('[payload:getAllPublishedProjects] Fetching projects from Payload CMS')
   const client = createPayloadClient()
   
   const cacheKey = 'payload:projects:published'
   let cached: Project[] | null = null
   
-  // Try to get from cache
-  try {
-    cached = await kv.get<Project[]>(cacheKey)
-    if (cached) {
-      // If any cached slugs look like Webflow IDs (24-hex), refresh. This happens if
-      // an older migration incorrectly stored `slug` as the Webflow item ID.
-      const hasLegacySlug = cached.some((p) => /^[0-9a-f]{24}$/i.test(p.slug))
-      const hasRelativeMedia = cached.some((p) => typeof p.coverImage === 'string' && p.coverImage.startsWith('/'))
-      if (!hasLegacySlug && !hasRelativeMedia) return cached
-      console.warn('[payload:getAllPublishedProjects] Detected legacy cache (slug/media); refreshing')
+  // Try to get from cache (skip if FORCE_REFRESH_PAYLOAD is set)
+  const forceRefresh = process.env.FORCE_REFRESH_PAYLOAD === 'true'
+  if (!forceRefresh) {
+    try {
+      cached = await kv.get<Project[]>(cacheKey)
+      if (cached) {
+        // If any cached slugs look like Webflow IDs (24-hex), refresh. This happens if
+        // an older migration incorrectly stored `slug` as the Webflow item ID.
+        const hasLegacySlug = cached.some((p) => /^[0-9a-f]{24}$/i.test(p.slug))
+        const hasRelativeMedia = cached.some((p) => typeof p.coverImage === 'string' && p.coverImage.startsWith('/'))
+        if (!hasLegacySlug && !hasRelativeMedia) {
+          console.log('[payload:getAllPublishedProjects] Returning cached data')
+          return cached
+        }
+        console.warn('[payload:getAllPublishedProjects] Detected legacy cache (slug/media); refreshing')
+      }
+    } catch (error) {
+      // KV not available, continue
+      console.warn('KV cache unavailable, fetching directly from Payload')
     }
-  } catch (error) {
-    // KV not available, continue
-    console.warn('KV cache unavailable, fetching directly from Payload')
+  } else {
+    console.log('[payload:getAllPublishedProjects] FORCE_REFRESH_PAYLOAD=true, skipping cache')
+    // Clear the cache when forcing refresh
+    try {
+      await kv.del(cacheKey)
+      console.log('[payload:getAllPublishedProjects] Cleared cache')
+    } catch (error) {
+      // KV not available, continue
+    }
   }
 
   // Fetch all projects with contributors populated
@@ -167,8 +190,8 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
           equals: false,
         },
       },
-      // Populate relationships
-      depth: 1,
+      // Populate relationships (depth 2 to include nested media like contributor profile pictures)
+      depth: 2,
     }
   )
 
@@ -177,9 +200,12 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
     payloadProjects.map((p) => transformProject(p, true))
   )
 
+  console.log(`[payload:getAllPublishedProjects] Fetched ${projects.length} projects from Payload CMS`)
+
   // Cache the results
   try {
     await kv.set(cacheKey, projects, { ex: CACHE_TTL })
+    console.log('[payload:getAllPublishedProjects] Cached projects')
   } catch (error) {
     // KV not available, continue
     console.warn('KV cache unavailable, skipping cache write')
@@ -217,7 +243,7 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
             equals: false,
           },
         },
-        depth: 1, // Populate relationships
+        depth: 2, // Populate relationships (depth 2 to include nested media like contributor profile pictures)
         limit: 1,
       },
     })

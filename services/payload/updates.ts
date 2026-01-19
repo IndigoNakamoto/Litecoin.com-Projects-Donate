@@ -4,6 +4,7 @@ import type { PayloadUpdate } from './types'
 import { getProjectBySlug } from './projects'
 import type { Update } from '@/services/webflow/updates'
 import { toAppID, toPayloadID } from './id'
+import { lexicalToHtml } from '@/utils/lexicalToHtml'
 
 const CACHE_TTL = 259200 // 3 days in seconds
 
@@ -23,9 +24,7 @@ function transformUpdate(payloadUpdate: PayloadUpdate): Update {
       name: payloadUpdate.title,
       title: payloadUpdate.title,
       summary: payloadUpdate.summary,
-      content: typeof payloadUpdate.content === 'string' 
-        ? payloadUpdate.content 
-        : JSON.stringify(payloadUpdate.content), // Rich text content
+      content: lexicalToHtml(payloadUpdate.content), // Rich text content converted to HTML
       project: toAppID(projectId),
       createdOn: payloadUpdate.createdAt,
       date: payloadUpdate.date,

@@ -4,7 +4,9 @@ import * as webflow from '@/services/webflow/projects'
 import * as payload from '@/services/payload/projects'
 
 export async function getAllPublishedProjects(...args: Parameters<typeof webflow.getAllPublishedProjects>) {
-  return usePayloadCMS()
+  const usePayload = usePayloadCMS()
+  console.log('[cms/projects] getAllPublishedProjects - USE_PAYLOAD_CMS:', usePayload)
+  return usePayload
     ? payload.getAllPublishedProjects(...args)
     : webflow.getAllPublishedProjects(...args)
 }
