@@ -1,0 +1,268 @@
+# Litecoin Fund - Static Context (Rules)
+
+## Project Overview
+
+**Purpose**: Public-facing Next.js application powering `litecoin.com/projects` and `litecoin.com/donate` pages, plus supporting API routes for projects and donations.
+
+**Tech Stack**:
+- Next.js 16 (App Router)
+- TypeScript (strict mode)
+- React 19
+- Prisma 7 (PostgreSQL)
+- Tailwind CSS 4
+- Vercel KV (caching)
+- The Giving Block (TGB) API integration
+
+**Key Relationships**:
+- Consumes data from Payload CMS (replacing Webflow)
+- Connects to PostgreSQL database (migrating to local Mac Mini via Cloudflare tunnel)
+- Integrates with The Giving Block for donation processing
+
+## Code Style
+
+### File Organization
+```
+app/
+├── api/              # API routes (App Router)
+│   ├── webflow/     # Webflow API routes (legacy, being replaced)
+│   ├── payload/     # Payload CMS API routes (new)
+│   ├── tgb/         # The Giving Block API routes
+│   └── cache/       # Cache management
+├── projects/         # Project pages
+└── donate/          # Donation page
+
+services/
+├── webflow/         # Webflow service layer (legacy)
+├── payload/         # Payload CMS service layer (new)
+└── tgb/            # TGB service layer
+
+components/          # React components
+lib/                # Shared libraries (Prisma, KV, utilities)
+types/              # TypeScript type definitions
+utils/              # Utility functions
+```
+
+### Styling Conventions
+
+**Reference**: See [STYLE_GUIDE.md](STYLE_GUIDE.md) for detailed Navigation component patterns.
+
+**Key Patterns**:
+- Tailwind CSS for utility-first styling
+- styled-jsx for component-scoped styles (used in Navigation)
+- Inline styles for dynamic values (scroll-based animations)
+- CSS custom properties for dynamic variables
+
+**Responsive Design**:
+- Mobile-first approach
+- Breakpoint: 992px (Tailwind `md` and above for desktop)
+- Dynamic values based on `isMobile` boolean
+
+**Color Interpolation**:
+- Use `interpolateColor()` function for scroll-based color transitions
+- Colors transition from `#222222` (dark) to `#C6D3D6` (light)
+- `bgOpacity` ranges from 0 (transparent) to 1 (fully opaque)
+
+### TypeScript Patterns
+
+- Use strict mode
+- Prefer type definitions in `types/` directory
+- Use Prisma-generated types where possible
+- Handle nullable values explicitly
+
+### API Route Patterns
+
+**App Router Route Handlers**:
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  // Handler logic
+  return NextResponse.json(data)
+}
+```
+
+**Error Handling**:
+- Always return proper HTTP status codes
+- Include error details in development, sanitize in production
+- Use try-catch for async operations
+
+**Caching**:
+- Use Vercel KV for caching (`@/lib/kv`)
+- Set appropriate cache headers
+- Cache keys should be versioned (e.g., `stats:all:v3`)
+
+## Business Logic
+
+### Donation Flow
+
+**The Giving Block (TGB) Integration**:
+- TGB handles fiat, crypto, and stock donations
+- Service layer: `services/tgb/client.ts` (handles authentication)
+- Types: `types/donation.ts`
+
+**Donation Types**:
+1. **Fiat**: Credit card payments via TGB
+2. **Crypto**: Cryptocurrency donations (deposit address generation)
+3. **Stock**: Stock donations with broker information and signature
+
+**Donation Pledge Flow**:
+1. User fills donation form
+2. Frontend calls legacy-parity endpoints (e.g., `/api/createFiatDonationPledge`)
+3. Backend proxies to TGB API (`/api/tgb/donations/fiat` or `/api/tgb/donations/crypto`)
+4. TGB returns pledge ID or deposit address
+5. Donation stored in `donations` table via `DonationPledge` model
+
+**Webhook Processing**:
+- TGB sends webhooks for deposit confirmations and conversions
+- Webhooks stored in `webhook_events` table
+- Processed donations update `donations` table with final amounts
+
+**Donation Context**:
+- React Context: `contexts/DonationContext.tsx`
+- Manages donation state across payment flow
+- Handles step navigation and form data
+
+### Project Data
+
+**CMS Migration**:
+- Currently using Webflow (`services/webflow/`)
+- Migrating to Payload CMS (`services/payload/`)
+- Service layers maintain same function signatures for compatibility
+
+**Project Service Functions**:
+- `getAllPublishedProjects()` - Get all published projects
+- `getProjectBySlug(slug)` - Get project by slug
+- `getProjectSummaries()` - Get lightweight project summaries
+- `getFAQsByProjectSlug(slug)` - Get FAQs for a project
+- `getPostsByProjectSlug(slug)` - Get posts for a project
+- `getUpdatesByProjectSlug(slug)` - Get updates for a project
+
+**Switching from Webflow to Payload**:
+- Update imports: `@/services/webflow/*` → `@/services/payload/*`
+- No other code changes needed (API compatibility maintained)
+
+## Database
+
+### Schema
+
+**Prisma Schema**: `prisma/schema.prisma`
+
+**Key Models**:
+- `DonationPledge` (maps to `donations` table) - Main donation model
+- `WebhookEvent` (maps to `webhook_events` table) - TGB webhook events
+- `MatchingDonationLog` - Matching donation tracking
+- `Log` - Application logs
+- `Token` - TGB API token caching
+
+**Legacy Parity Requirements**:
+- Must maintain exact table/column names from legacy project
+- Column mapping uses `@map()` directive (e.g., `@map("pledge_amount")`)
+- Schema must match legacy production database
+
+**Database Connection**:
+- Uses `DATABASE_URL` environment variable
+- Prisma client: `lib/prisma.ts`
+- Currently: Vercel Postgres (Neon PostgreSQL)
+- Target: Local Mac Mini via Cloudflare tunnel
+
+### Important Schema Notes
+
+- `pledgeAmount` field maps to `pledge_amount` column (not `pledgeAmount`)
+- Decimal fields use `@db.Decimal(10, 2)` for precision
+- JSON fields for flexible data (e.g., `eventData`)
+
+## Migration Context
+
+### Current Status
+
+**CMS Migration**:
+- Webflow → Payload CMS (in progress)
+- Service layer abstraction allows seamless switching
+- Both service layers exist in parallel
+
+**API Routes**:
+- Legacy-parity endpoints maintained for frontend compatibility
+- New TGB proxy endpoints (`/api/tgb/donations/*`)
+- Missing routes documented in [MIGRATION_READINESS.md](../MIGRATION_READINESS.md)
+
+**Missing Features** (from MIGRATION_READINESS.md):
+- Cron jobs configuration (`vercel.json`)
+- Cron API routes (`/api/cron/daily`, `/api/cron/monthly`, `/api/clearKV`)
+- Webhook handler (`/api/webhook/tgb`)
+- Various other API routes (see migration checklist)
+
+### Parity Requirements
+
+**Legacy Endpoint Compatibility**:
+- All legacy endpoints must maintain same request/response format
+- Frontend expects specific endpoint signatures
+- Don't break existing donation flow
+
+**Database Compatibility**:
+- Schema must match legacy database structure
+- Column names must be exact (snake_case)
+- Relations must be preserved
+
+## Key Files
+
+- [README.md](README.md) - Project documentation
+- [STYLE_GUIDE.md](STYLE_GUIDE.md) - Navigation component style guide
+- [MIGRATION_READINESS.md](../MIGRATION_READINESS.md) - Migration status and checklist
+- `prisma/schema.prisma` - Database schema
+- `services/tgb/client.ts` - TGB API client
+- `contexts/DonationContext.tsx` - Donation state management
+- `types/donation.ts` - Donation type definitions
+
+## Common Patterns
+
+### Service Layer Pattern
+
+```typescript
+// services/payload/projects.ts
+export async function getProjectBySlug(slug: string): Promise<Project | null> {
+  // Implementation
+}
+```
+
+### API Route Pattern
+
+```typescript
+// app/api/example/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { kv } from '@/lib/kv'
+
+export async function GET(request: NextRequest) {
+  try {
+    // Check cache
+    const cached = await kv.get('key')
+    if (cached) return NextResponse.json(cached)
+    
+    // Fetch data
+    const data = await fetchData()
+    
+    // Cache and return
+    await kv.set('key', data, { ex: 3600 })
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  }
+}
+```
+
+### Prisma Query Pattern
+
+```typescript
+import { prisma } from '@/lib/prisma'
+
+const donations = await prisma.donationPledge.findMany({
+  where: { projectSlug: slug },
+  // ...
+})
+```
+
+## Notes
+
+- Always check [MIGRATION_READINESS.md](../MIGRATION_READINESS.md) before making breaking changes
+- Update rules immediately when patterns change or AI fails at a task
+- Keep rules minimal and high-quality - they're included in every conversation
+- For migration workflows, see `.cursor/skills/` directory

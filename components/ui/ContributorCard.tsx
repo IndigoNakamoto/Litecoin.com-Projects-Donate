@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import ReactModal from 'react-modal'
 import SocialIcon from './SocialIcon'
+import { customImageLoader } from '@/utils/customImageLoader'
 import type { Contributor } from '@/types/project'
 
 export interface ContributorCardProps {
@@ -89,6 +90,7 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, backgrou
         <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-full transition-transform duration-300 group-hover:scale-105">
           {contributor.avatar ? (
             <Image
+              loader={customImageLoader}
               src={contributor.avatar}
               alt={contributor.name}
               className="h-full w-full rounded-full object-cover p-1"
