@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { lexicalToHtml } from '@/utils/lexicalToHtml'
 
 type FAQItem = {
   question: string
@@ -85,18 +85,31 @@ export const FAQSection: React.FC<{
 
   faqs.forEach((faq) => {
     // Extract the necessary fields from fieldData
-    const { category = 'General', name: question, answer } = faq.fieldData || {}
+    // The field is called "question" not "name" in the payload service
+    const fieldData = faq.fieldData || {}
+    const category = fieldData.category || 'General'
+    const question = fieldData.question || faq.question || ''
+    const answer = fieldData.answer || faq.answer || ''
 
-    const faqItem: FAQItem = {
-      question: question || faq.question || '',
-      answer: answer || faq.answer || '',
+    // Convert answer to HTML if it's Lexical JSON, otherwise use it as-is (already HTML)
+    let answerHtml = answer
+    
+    // If answer is still Lexical JSON (object), convert it to HTML
+    if (typeof answerHtml !== 'string' || (typeof answerHtml === 'string' && (answerHtml.trim().startsWith('{') || answerHtml.trim().startsWith('[')))) {
+      answerHtml = lexicalToHtml(answerHtml)
     }
 
-    // Assign FAQs to their respective categories
-    if (categoryMap[category]) {
-      categoryMap[category].push(faqItem)
+    const faqItem: FAQItem = {
+      question: question,
+      answer: answerHtml,
+    }
+
+    // Assign FAQs to their respective categories (ensure category is a string)
+    const categoryKey = String(category).trim() || 'General'
+    if (categoryMap[categoryKey]) {
+      categoryMap[categoryKey].push(faqItem)
     } else {
-      categoryMap[category] = [faqItem]
+      categoryMap[categoryKey] = [faqItem]
     }
   })
 
@@ -113,7 +126,7 @@ export const FAQSection: React.FC<{
       {faqCategories.map((category, catIndex) => (
         <div key={catIndex} className="">
           <h4 className="mb-4 pt-4 font-space-grotesk text-[30px] font-semibold text-[black] ">
-            {category.category.trim()}
+            {category.category || 'General'}
           </h4>
           {category.items.map((faq, qIndex) => (
             <div key={qIndex} className="mb-4">
@@ -125,7 +138,7 @@ export const FAQSection: React.FC<{
                   }
                 }}
                 style={{ backgroundColor: bg }}
-                className="flex w-full cursor-pointer items-center justify-between rounded-none! py-6! p-6 text-left font-space-grotesk text-xl font-semibold !text-black focus:border-[#222222] focus:outline-none"
+                className="flex w-full cursor-pointer items-center justify-between rounded-none! py-6! p-6 text-left font-space-grotesk text-xl font-semibold text-black! focus:border-[#222222] focus:outline-none"
               >
                 <span>{faq.question}</span>
                 <PlusIcon
@@ -144,17 +157,20 @@ export const FAQSection: React.FC<{
                 )}`}
               >
                 <div
-                  className="text-md p-6 !text-black"
+                  className="text-md p-6 text-black!"
                   style={{
                     fontFamily:
                       'system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif',
                   }}
                 >
-                  <div className="markdown text-md !text-black">
-                    <ReactMarkdown>
-                      {faq.answer}
-                    </ReactMarkdown>
-                  </div>
+                  {faq.answer ? (
+                    <div 
+                      className="markdown text-md text-black!"
+                      dangerouslySetInnerHTML={{ __html: faq.answer }}
+                    />
+                  ) : (
+                    <p className="text-gray-500 italic">No answer available.</p>
+                  )}
                 </div>
               </div>
             </div>
