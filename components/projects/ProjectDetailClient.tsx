@@ -253,6 +253,23 @@ export default function ProjectDetailClient({
   }, [searchParams, project, dispatch])
 
   const openPaymentModal = () => {
+    // Prevent opening payment modal for completed or closed projects
+    const normalizedStatus = project.status?.toLowerCase().trim() || ''
+    const isCompletedOrClosed = 
+      bountyStatus === BountyStatus.COMPLETED ||
+      bountyStatus === BountyStatus.BOUNTY_COMPLETED ||
+      bountyStatus === BountyStatus.CLOSED ||
+      bountyStatus === BountyStatus.BOUNTY_CLOSED ||
+      normalizedStatus === 'completed' ||
+      normalizedStatus === 'bounty completed' ||
+      normalizedStatus === 'closed' ||
+      normalizedStatus === 'bounty closed' ||
+      normalizedStatus === 'archived'
+    
+    if (isCompletedOrClosed) {
+      return // Don't open the modal for completed/closed projects
+    }
+
     setSelectedProject(project)
     setModalOpen(true)
 
@@ -355,6 +372,7 @@ export default function ProjectDetailClient({
           monthlyDonorCount={monthlyDonorCount}
           timeLeftInMonth={timeLeftInMonth}
           bountyStatus={bountyStatus as BountyStatus}
+          projectStatus={project.status}
           openPaymentModal={openPaymentModal}
         />
       </article>

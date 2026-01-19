@@ -21,6 +21,11 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
     )
   }
 
+  // Helper function to check if a string is a valid non-empty URL
+  const isValidLink = (link: unknown): link is string => {
+    return typeof link === 'string' && link.trim().length > 0
+  }
+
   // Filter and render only posts with valid links
   const renderedPosts = posts
     .map((post) => {
@@ -36,7 +41,7 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
       const link = (fieldData as Record<string, unknown>).link as string | undefined
 
       // If there's a single 'link' field, try to determine its type
-      if (link && !xPostLink && !youtubeLink && !redditLink) {
+      if (isValidLink(link) && !isValidLink(xPostLink) && !isValidLink(youtubeLink) && !isValidLink(redditLink)) {
         if (link.includes('youtube.com') || link.includes('youtu.be')) {
           const YouTubeID = extractYouTubeID(link)
           if (YouTubeID) {
@@ -65,7 +70,7 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
       }
 
       // Check each link type and render accordingly
-      if (youtubeLink) {
+      if (isValidLink(youtubeLink)) {
         const YouTubeID = extractYouTubeID(youtubeLink)
         if (YouTubeID) {
           return (
@@ -76,7 +81,7 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
         }
       }
 
-      if (xPostLink) {
+      if (isValidLink(xPostLink)) {
         const XPostID = extractXPostID(xPostLink)
         if (XPostID) {
           return (
@@ -87,7 +92,7 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
         }
       }
 
-      if (redditLink) {
+      if (isValidLink(redditLink)) {
         return (
           <div key={id} className="post-item">
             <PostReddit redditPostURL={redditLink} />
@@ -104,6 +109,20 @@ const PostsList: React.FC<PostsListProps> = ({ posts }) => {
     .filter((post) => post !== null)
 
   if (renderedPosts.length === 0) {
+    // If we have posts but none rendered, show a more informative message
+    if (posts.length > 0) {
+      return (
+        <div className="posts-list">
+          <h2>Posts ({posts.length})</h2>
+          <p className="text-gray-600 mt-4">
+            {posts.length} post{posts.length !== 1 ? 's' : ''} found but {posts.length === 1 ? 'it has' : 'they have'} no valid links (X/Twitter, YouTube, or Reddit) to display.
+            <br />
+            Please add links to these posts in the CMS to display them here.
+          </p>
+        </div>
+      )
+    }
+    
     return (
       <div className="posts-list">
         <h2>Posts</h2>

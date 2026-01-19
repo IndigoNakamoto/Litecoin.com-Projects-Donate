@@ -44,21 +44,68 @@ export async function POST() {
         }
       )
 
-      // Clear individual project caches
-      for (const project of payloadProjects) {
+      // Clear individual project caches (posts, FAQs, updates use project IDs, not slugs)
+      // We need to fetch full project data to get IDs
+      const fullProjects = await fetchAllPages<{ id: number; slug: string }>(
+        client,
+        '/projects',
+        {
+          where: {
+            hidden: {
+              equals: false,
+            },
+          },
+          limit: 100,
+        }
+      )
+
+      for (const project of fullProjects) {
+        // Clear project by slug cache
         const projectCacheKey = `payload:project:${project.slug}`
         try {
           const deleted = await kv.del(projectCacheKey)
           if (deleted > 0) {
             clearedKeys.push(projectCacheKey)
-            console.log(`[clear-payload-cache] Cleared: ${projectCacheKey}`)
+          }
+        } catch (err) {
+          // Key might not exist, continue
+        }
+
+        // Clear posts cache for this project
+        const postsCacheKey = `payload:posts:project:${project.id}`
+        try {
+          const deleted = await kv.del(postsCacheKey)
+          if (deleted > 0) {
+            clearedKeys.push(postsCacheKey)
+          }
+        } catch (err) {
+          // Key might not exist, continue
+        }
+
+        // Clear FAQs cache for this project
+        const faqsCacheKey = `payload:faqs:project:${project.id}`
+        try {
+          const deleted = await kv.del(faqsCacheKey)
+          if (deleted > 0) {
+            clearedKeys.push(faqsCacheKey)
+          }
+        } catch (err) {
+          // Key might not exist, continue
+        }
+
+        // Clear updates cache for this project
+        const updatesCacheKey = `payload:updates:project:${project.id}`
+        try {
+          const deleted = await kv.del(updatesCacheKey)
+          if (deleted > 0) {
+            clearedKeys.push(updatesCacheKey)
           }
         } catch (err) {
           // Key might not exist, continue
         }
       }
 
-      console.log(`[clear-payload-cache] Processed ${payloadProjects.length} projects for cache clearing`)
+      console.log(`[clear-payload-cache] Processed ${fullProjects.length} projects for cache clearing`)
     } catch (error) {
       console.warn('[clear-payload-cache] Error fetching projects to clear individual caches:', error)
       // Continue even if we can't fetch projects - we've already cleared the main cache

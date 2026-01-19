@@ -6,6 +6,10 @@ import { notFound } from 'next/navigation'
 import ProjectDetailClient from '@/components/projects/ProjectDetailClient'
 import { Suspense } from 'react'
 
+// Force dynamic rendering to avoid stale cache for project status
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function ProjectPage({
   params,
 }: {

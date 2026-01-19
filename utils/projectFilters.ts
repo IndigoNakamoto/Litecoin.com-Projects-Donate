@@ -31,14 +31,34 @@ export function isOpenBounty(project: Project): boolean {
  */
 export function isPastProject(project: Project): boolean {
   const status = project.status || ''
-  const trimmedStatus = status.trim()
+  // Normalize: trim whitespace and handle potential encoding issues
+  const normalizedStatus = status.trim().replace(/\s+/g, ' ')
   
-  return [
+  const completedStatuses = [
     'Bounty Closed', 
     'Bounty Completed', 
     'Closed', 
     'Completed'
-  ].includes(trimmedStatus)
+  ]
+  
+  const isMatch = completedStatuses.includes(normalizedStatus)
+  
+  // Debug logging in development
+  if (process.env.NODE_ENV === 'development' && status && !isMatch) {
+    // Check if it's close to a match (for debugging)
+    const lowerStatus = normalizedStatus.toLowerCase()
+    const lowerCompleted = completedStatuses.map(s => s.toLowerCase())
+    if (lowerCompleted.some(s => lowerStatus.includes(s) || s.includes(lowerStatus))) {
+      console.warn(`[isPastProject] Status "${status}" (normalized: "${normalizedStatus}") is close to a completed status but doesn't match exactly.`, {
+        status,
+        normalizedStatus,
+        charCodes: normalizedStatus.split('').map(c => c.charCodeAt(0)),
+        length: normalizedStatus.length
+      })
+    }
+  }
+  
+  return isMatch
 }
 
 /**

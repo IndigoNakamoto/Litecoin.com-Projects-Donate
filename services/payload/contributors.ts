@@ -11,9 +11,20 @@ const CACHE_TTL = 259200 // 3 days in seconds
  */
 function transformContributor(payloadContributor: PayloadContributor): Contributor {
   const profilePicture = payloadContributor.profilePicture
-  const avatarUrl = resolvePayloadAssetUrl(
-    typeof profilePicture === 'object' && profilePicture ? profilePicture.url : undefined
-  )
+  // Handle profilePicture - it can be an ID (number), object with url, or null/undefined
+  let avatarUrl: string | undefined = undefined
+  
+  // More explicit handling of the profilePicture object
+  if (profilePicture && typeof profilePicture === 'object' && !Array.isArray(profilePicture)) {
+    // The actual Payload response has more fields than our type, so cast to any to access url
+    const pictureObj = profilePicture as any
+    if (pictureObj.url && typeof pictureObj.url === 'string') {
+      avatarUrl = resolvePayloadAssetUrl(pictureObj.url)
+    }
+  } else if (typeof profilePicture === 'number') {
+    // If it's just an ID, we'd need to fetch it, but this shouldn't happen with depth=2
+    console.warn(`[transformContributor] Contributor ${payloadContributor.id} (${payloadContributor.name}) has profilePicture as ID (${profilePicture}), not populated. Need depth > 1 for nested media.`)
+  }
 
   return {
     id: toAppID(payloadContributor.id),
@@ -48,9 +59,11 @@ export async function getAllActiveContributors(): Promise<Contributor[]> {
   }
 
   const client = createPayloadClient()
+  // Explicitly pass depth=2 to ensure profilePicture is populated
   const payloadContributors = await fetchAllPages<PayloadContributor>(
     client,
-    '/contributors'
+    '/contributors',
+    { depth: 2 }
   )
 
   // Transform to our Contributor type

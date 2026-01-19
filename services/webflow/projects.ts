@@ -199,25 +199,39 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
   const cacheKey = 'webflow:projects:published'
   let cached: Project[] | null = null
   
-  // Try to get from cache, but don't fail if KV is not configured
-  try {
-    cached = await kv.get<Project[]>(cacheKey)
-    // If we have cached data, ensure status labels are mapped (in case cache has old IDs)
-    if (cached) {
-      // Check if any project has a status that looks like an ID (long alphanumeric string)
-      // If so, re-map the statuses
-      const needsRemapping = cached.some(p => p.status && p.status.length > 20 && !p.status.includes(' '))
-      if (needsRemapping) {
-        cached = cached.map(p => ({
-          ...p,
-          status: statusMap[p.status] || p.status
-        }))
-      }
-      return cached
+  // Check if force refresh is enabled
+  const forceRefresh = process.env.FORCE_REFRESH_WEBFLOW === 'true'
+  
+  if (forceRefresh) {
+    console.log('[webflow:getAllPublishedProjects] FORCE_REFRESH_WEBFLOW=true, skipping cache')
+    // Clear the cache when forcing refresh
+    try {
+      await kv.del(cacheKey)
+      console.log('[webflow:getAllPublishedProjects] Cleared cache')
+    } catch {
+      // KV not available, continue
     }
-  } catch {
-    // KV not configured or unavailable, continue without cache
-    console.warn('KV cache unavailable, fetching directly from Webflow')
+  } else {
+    // Try to get from cache, but don't fail if KV is not configured
+    try {
+      cached = await kv.get<Project[]>(cacheKey)
+      // If we have cached data, ensure status labels are mapped (in case cache has old IDs)
+      if (cached) {
+        // Check if any project has a status that looks like an ID (long alphanumeric string)
+        // If so, re-map the statuses
+        const needsRemapping = cached.some(p => p.status && p.status.length > 20 && !p.status.includes(' '))
+        if (needsRemapping) {
+          cached = cached.map(p => ({
+            ...p,
+            status: statusMap[p.status] || p.status
+          }))
+        }
+        return cached
+      }
+    } catch {
+      // KV not configured or unavailable, continue without cache
+      console.warn('KV cache unavailable, fetching directly from Webflow')
+    }
   }
   
   const allProjects = await listCollectionItems<WebflowProject>(

@@ -104,6 +104,31 @@ async function transformProject(
     }
   }
 
+  /**
+   * Map Payload CMS status to Webflow-compatible status format
+   * Payload uses: 'active' | 'completed' | 'paused' | 'archived'
+   * Webflow uses: 'Open' | 'Completed' | 'Closed' | 'Bounty Open' | 'Bounty Closed' | 'Bounty Completed'
+   */
+  const mapPayloadStatusToWebflow = (payloadStatus: string): string => {
+    const statusMap: Record<string, string> = {
+      'active': 'Open',
+      'completed': 'Completed',
+      'paused': 'Closed',
+      'archived': 'Closed',
+    }
+    const normalizedStatus = payloadStatus.toLowerCase().trim()
+    const mappedStatus = statusMap[normalizedStatus] || payloadStatus
+    
+    // Debug logging for status transformation (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      if (normalizedStatus === 'completed' || normalizedStatus === 'active') {
+        console.log(`[transformProject] Status mapping: "${payloadStatus}" → "${mappedStatus}" for project: ${payloadProject.slug}`)
+      }
+    }
+    
+    return mappedStatus
+  }
+
   return {
     id: toAppID(payloadProject.id),
     name: payloadProject.name,
@@ -111,7 +136,7 @@ async function transformProject(
     summary: payloadProject.summary,
     content: lexicalToHtml(payloadProject.content),
     coverImage: coverImageUrl,
-    status: payloadProject.status,
+    status: mapPayloadStatusToWebflow(payloadProject.status),
     projectType: payloadProject.projectType,
     hidden: payloadProject.hidden,
     recurring: payloadProject.recurring,
@@ -162,8 +187,9 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
         if (!hasLegacySlug && !hasRelativeMedia) {
           console.log('[payload:getAllPublishedProjects] Returning cached data')
           return cached
+        } else {
+          console.warn('[payload:getAllPublishedProjects] Detected legacy cache (slug/media); refreshing')
         }
-        console.warn('[payload:getAllPublishedProjects] Detected legacy cache (slug/media); refreshing')
       }
     } catch (error) {
       // KV not available, continue
@@ -201,6 +227,20 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
   )
 
   console.log(`[payload:getAllPublishedProjects] Fetched ${projects.length} projects from Payload CMS`)
+  
+  // Debug: Log projects with completed status
+  const completedProjects = projects.filter(p => 
+    p.status === 'Completed' || p.status?.toLowerCase().includes('completed')
+  )
+  if (completedProjects.length > 0) {
+    console.log(`[payload:getAllPublishedProjects] Found ${completedProjects.length} completed project(s):`, 
+      completedProjects.map(p => ({ name: p.name, slug: p.slug, status: p.status }))
+    )
+  } else {
+    console.warn('[payload:getAllPublishedProjects] No projects with "Completed" status found. All project statuses:', 
+      projects.map(p => ({ name: p.name, slug: p.slug, status: p.status }))
+    )
+  }
 
   // Cache the results
   try {

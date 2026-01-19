@@ -30,10 +30,47 @@ export function useProjectFiltering(projects: Project[]): FilteredProjects {
       bountyStatus: determineBountyStatus(project.status),
     }))
 
-    // Filter by category
-    const openProjects = transformedProjects.filter(isProject)
-    const bounties = transformedProjects.filter(isOpenBounty)
+    // Filter by category - ensure each project only appears in one category
+    // Priority: Completed > Open Bounties > Open Projects
+    // This prevents a project from appearing in multiple sections
     const completed = transformedProjects.filter(isPastProject)
+    const bounties = transformedProjects.filter(p => isOpenBounty(p) && !isPastProject(p))
+    const openProjects = transformedProjects.filter(p => isProject(p) && !isPastProject(p) && !isOpenBounty(p))
+    
+    // Debug logging for projects with "Completed" status
+    if (process.env.NODE_ENV === 'development') {
+      const completedStatusProjects = transformedProjects.filter(p => 
+        p.status && (p.status.includes('Completed') || p.status.includes('Closed'))
+      )
+      if (completedStatusProjects.length > 0) {
+        console.log('[useProjectFiltering] Projects with Completed/Closed status:', 
+          completedStatusProjects.map(p => ({
+            name: p.name,
+            slug: p.slug,
+            status: p.status,
+            statusLength: p.status?.length,
+            statusCharCodes: p.status?.split('').map(c => c.charCodeAt(0)),
+            isPastProject: isPastProject(p),
+            isProject: isProject(p),
+            isOpenBounty: isOpenBounty(p)
+          }))
+        )
+      }
+      
+      // Log any projects that don't match any filter
+      const unmatchedProjects = transformedProjects.filter(p => 
+        !isPastProject(p) && !isOpenBounty(p) && !isProject(p)
+      )
+      if (unmatchedProjects.length > 0) {
+        console.warn('[useProjectFiltering] Projects that don\'t match any filter:', 
+          unmatchedProjects.map(p => ({
+            name: p.name,
+            slug: p.slug,
+            status: p.status
+          }))
+        )
+      }
+    }
     
     // Fallback: if no projects match filters, show all as open-source projects
     const allProjectsEmpty = openProjects.length === 0 && bounties.length === 0 && completed.length === 0

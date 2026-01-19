@@ -36,25 +36,59 @@ export function determineBountyStatus(
   }
 }
 
-export function isButtonDisabled(bountyStatus?: BountyStatus): boolean {
-  return (
+export function isButtonDisabled(bountyStatus?: BountyStatus, projectStatus?: string): boolean {
+  // Check bountyStatus first (legacy support)
+  // Handle both enum value and string value for compatibility
+  const bountyStatusValue = typeof bountyStatus === 'string' ? bountyStatus : bountyStatus
+  if (
     bountyStatus === BountyStatus.COMPLETED ||
     bountyStatus === BountyStatus.BOUNTY_COMPLETED ||
     bountyStatus === BountyStatus.CLOSED ||
-    bountyStatus === BountyStatus.BOUNTY_CLOSED
-  )
+    bountyStatus === BountyStatus.BOUNTY_CLOSED ||
+    bountyStatusValue === 'Completed' ||
+    bountyStatusValue === 'Bounty Completed' ||
+    bountyStatusValue === 'Closed' ||
+    bountyStatusValue === 'Bounty Closed'
+  ) {
+    return true
+  }
+  
+  // Also check project status directly (case-insensitive)
+  if (projectStatus) {
+    const normalizedStatus = projectStatus.toLowerCase().trim()
+    if (
+      normalizedStatus === 'completed' ||
+      normalizedStatus === 'bounty completed' ||
+      normalizedStatus === 'closed' ||
+      normalizedStatus === 'bounty closed' ||
+      normalizedStatus === 'archived'
+    ) {
+      return true
+    }
+  }
+  
+  return false
 }
 
-export function getButtonText(bountyStatus?: BountyStatus): string {
-  if (
+export function getButtonText(bountyStatus?: BountyStatus, projectStatus?: string): string {
+  // Determine status from either source
+  const normalizedStatus = projectStatus?.toLowerCase().trim() || ''
+  const isCompleted = 
     bountyStatus === BountyStatus.COMPLETED ||
-    bountyStatus === BountyStatus.BOUNTY_COMPLETED
-  ) {
-    return 'PROJECT COMPLETED'
-  } else if (
+    bountyStatus === BountyStatus.BOUNTY_COMPLETED ||
+    normalizedStatus === 'completed' ||
+    normalizedStatus === 'bounty completed'
+  
+  const isClosed = 
     bountyStatus === BountyStatus.CLOSED ||
-    bountyStatus === BountyStatus.BOUNTY_CLOSED
-  ) {
+    bountyStatus === BountyStatus.BOUNTY_CLOSED ||
+    normalizedStatus === 'closed' ||
+    normalizedStatus === 'bounty closed' ||
+    normalizedStatus === 'archived'
+  
+  if (isCompleted) {
+    return 'PROJECT COMPLETED'
+  } else if (isClosed) {
     return 'PROJECT CLOSED'
   } else {
     return 'DONATE'

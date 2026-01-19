@@ -28,6 +28,7 @@ type AsideSectionProps = {
   timeLeftInMonth?: number
   serviceFeeCollected?: number
   bountyStatus?: BountyStatus
+  projectStatus?: string
   totalPaid?: number
   openPaymentModal: () => void
 }
@@ -44,6 +45,7 @@ const AsideSection: React.FC<AsideSectionProps> = ({
   litecoinRaised,
   litecoinPaid,
   bountyStatus,
+  projectStatus,
   isMatching,
   isBitcoinOlympics2024,
   isRecurring,
@@ -98,9 +100,9 @@ const AsideSection: React.FC<AsideSectionProps> = ({
             onClick={openPaymentModal}
             variant="primary"
             className="block h-10 w-full"
-            disabled={isButtonDisabled(bountyStatus)}
+            disabled={isButtonDisabled(bountyStatus, projectStatus)}
           >
-            {getButtonText(bountyStatus)}
+            {getButtonText(bountyStatus, projectStatus)}
           </Button>
         </div>
       </div>
