@@ -1,20 +1,26 @@
 // prisma/config.ts
-// Note: Prisma configuration is done in schema.prisma, not here
-// This file is kept for potential utility exports if needed
+// Prisma 7 configuration file for migrations and db push commands
+
+import type { PrismaConfig } from 'prisma'
 
 /**
  * Get the database URL from environment variables
- * Prisma reads this from DATABASE_URL automatically in schema.prisma
  */
 export function getDatabaseUrl(): string {
   return process.env.DATABASE_URL || ''
 }
 
-const config = {
-  datasource: {
-    url: getDatabaseUrl(),
+const config: PrismaConfig = {
+  earlyAccess: true,
+  schema: './prisma/schema.prisma',
+  migrate: {
+    adapter: async () => {
+      const { Pool } = await import('pg')
+      const { PrismaPg } = await import('@prisma/adapter-pg')
+      const pool = new Pool({ connectionString: getDatabaseUrl() })
+      return new PrismaPg(pool)
+    },
   },
 }
 
 export default config
-
