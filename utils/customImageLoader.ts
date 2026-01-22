@@ -55,7 +55,7 @@ export const optimizeWebflowImageUrl = (
 
 export const customImageLoader = ({ src, width, quality }: { src: string; width: number; quality?: number }) => {
   // Proxy Payload CMS localhost images through Next.js API to avoid blocking
-  if (src.includes('localhost:3001') || src.includes('127.0.0.1:3001')) {
+  if (src.includes('localhost:3011') || src.includes('127.0.0.1:3011')) {
     // Use Next.js proxy route for localhost images
     const proxyUrl = `/api/proxy-payload-image?url=${encodeURIComponent(src)}`
     // With unoptimized: true, we can return the proxied URL directly

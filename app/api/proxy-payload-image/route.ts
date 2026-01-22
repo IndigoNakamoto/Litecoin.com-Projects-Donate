@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * Proxy route to serve Payload CMS images through Next.js
  * This avoids Next.js Image component blocking localhost images
  * 
- * Usage: /api/proxy-payload-image?url=http://localhost:3001/api/media/file/xyz.jpg
+ * Usage: /api/proxy-payload-image?url=http://localhost:3011/api/media/file/xyz.jpg
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
    */
 
   // Only allow Payload CMS URLs for security
-  const payloadUrl = process.env.PAYLOAD_CMS_URL || 'http://localhost:3001'
+  const payloadUrl = process.env.PAYLOAD_CMS_URL || 'http://localhost:3011'
   // Allow relative URLs coming directly from Payload (e.g. "/api/media/file/...")
   if (imageUrl.startsWith('/')) {
     imageUrl = `${payloadUrl.replace(/\/+$/, '')}${imageUrl}`
@@ -43,13 +43,13 @@ export async function GET(request: NextRequest) {
     payloadOrigin = new URL(payloadUrl).origin
   } catch {
     // If PAYLOAD_CMS_URL is misconfigured, fall back to a safe default
-    payloadOrigin = 'http://localhost:3001'
+    payloadOrigin = 'http://localhost:3011'
   }
 
   const allowedOrigins = new Set<string>([
     payloadOrigin,
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
+    'http://localhost:3011',
+    'http://127.0.0.1:3011',
   ])
 
   if (!allowedOrigins.has(parsed.origin)) {

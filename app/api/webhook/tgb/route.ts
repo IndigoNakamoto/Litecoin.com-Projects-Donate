@@ -143,7 +143,7 @@ async function handleDepositTransaction(
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      },
+      } as any, // Cast to any to satisfy Prisma Json type
       updatedAt: new Date(),
     },
   })
@@ -154,7 +154,7 @@ async function handleDepositTransaction(
     update: { processed: true },
     create: {
       eventType: 'DEPOSIT_TRANSACTION',
-      payload: payload as unknown as Record<string, unknown>,
+      payload: payload as any, // Cast to any to satisfy Prisma Json type
       donationId: donation.id,
       eid: payload.eid,
       processed: true,
@@ -220,7 +220,7 @@ async function handleTransactionConverted(
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      },
+      } as any, // Cast to any to satisfy Prisma Json type
       updatedAt: new Date(),
     },
   })
@@ -229,7 +229,7 @@ async function handleTransactionConverted(
   await prisma.webhookEvent.create({
     data: {
       eventType: 'TRANSACTION_CONVERTED',
-      payload: payload as unknown as Record<string, unknown>,
+      payload: payload as any, // Cast to any to satisfy Prisma Json type
       donationId: donation.id,
       eid: payload.eid,
       processed: true,
@@ -291,7 +291,7 @@ async function handleUnknownEvent(
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      },
+      } as any, // Cast to any to satisfy Prisma Json type
       updatedAt: new Date(),
     },
   })
@@ -300,7 +300,7 @@ async function handleUnknownEvent(
   await prisma.webhookEvent.create({
     data: {
       eventType,
-      payload,
+      payload: payload as any, // Cast to any to satisfy Prisma Json type
       donationId: donation.id,
       eid,
       processed: true,

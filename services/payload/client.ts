@@ -5,19 +5,19 @@ function stripTrailingSlashes(url: string): string {
 }
 
 function resolvePayloadApiUrl(): string {
-  // Check if Payload CMS is enabled first - if so, ensure we use port 3001
+  // Check if Payload CMS is enabled first - if so, ensure we use port 3011
   const usePayload = process.env.USE_PAYLOAD_CMS?.trim().toLowerCase()
   const isPayloadEnabled = usePayload === 'true' || usePayload === '1' || usePayload === 'yes' || usePayload === 'on'
   
   // Explicit API URL always wins, BUT if it points to port 3000 and Payload is enabled, override it
   const explicitUrl = process.env.PAYLOAD_API_URL
   if (explicitUrl) {
-    // If Payload CMS is enabled but URL points to Next.js (3000), use Payload CMS (3001) instead
+    // If Payload CMS is enabled but URL points to Next.js (3000), use Payload CMS (3011) instead
     if (isPayloadEnabled && explicitUrl.includes(':3000')) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`[resolvePayloadApiUrl] PAYLOAD_API_URL points to port 3000 but USE_PAYLOAD_CMS is enabled. Using port 3001 instead.`)
+        console.warn(`[resolvePayloadApiUrl] PAYLOAD_API_URL points to port 3000 but USE_PAYLOAD_CMS is enabled. Using port 3011 instead.`)
       }
-      return explicitUrl.replace(':3000', ':3001')
+      return explicitUrl.replace(':3000', ':3011')
     }
     return explicitUrl
   }
@@ -30,9 +30,9 @@ function resolvePayloadApiUrl(): string {
   }
 
   // Migration convenience: if toggled on and no URL is set, assume the local
-  // Payload instance is running on 3001 (your current dev setup).
+  // Payload instance is running on 3011 (to avoid conflicts with other projects).
   if (isPayloadEnabled) {
-    return 'http://localhost:3001/api'
+    return 'http://localhost:3011/api'
   }
 
   // Default from the integration guide (should NOT be used when USE_PAYLOAD_CMS is true)

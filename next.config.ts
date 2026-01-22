@@ -5,7 +5,7 @@ const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-eval' 'unsafe-inline' giscus.app https://dev.shift4.com https://js.dev.shift4.com https://widget.thegivingblock.com https://vercel.live https://va.vercel-scripts.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  img-src 'self' https://pbs.twimg.com https://unavatar.io https://abs.twimg.com https://static.tgb-preprod.com https://static.tgbwidget.com https://cdn.prod.website-files.com https://litecoin.com https://litecoin.net https://uploads-ssl.webflow.com https://static.webflow.com https://images.webflow.com https://dev.shift4.com https://t.dev.shift4.com http://localhost:3001 http://127.0.0.1:3001 blob: data:;
+  img-src 'self' https://pbs.twimg.com https://unavatar.io https://abs.twimg.com https://static.tgb-preprod.com https://static.tgbwidget.com https://cdn.prod.website-files.com https://litecoin.com https://litecoin.net https://uploads-ssl.webflow.com https://static.webflow.com https://images.webflow.com https://dev.shift4.com https://t.dev.shift4.com http://localhost:3011 http://127.0.0.1:3011 blob: data:;
   media-src 'self' https://video.twimg.com;
   connect-src 'self' https://react-tweet.vercel.app https://vitals.vercel-insights.com https://public-api.tgbwidget.com https://dev.shift4.com https://t.dev.shift4.com;
   font-src 'self' https://fonts.gstatic.com;
@@ -58,13 +58,13 @@ const nextConfig: NextConfig = {
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '3001',
+        port: '3011',
         pathname: '/api/media/**',
       },
       {
         protocol: 'http',
         hostname: '127.0.0.1',
-        port: '3001',
+        port: '3011',
         pathname: '/api/media/**',
       },
     ],

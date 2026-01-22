@@ -31,7 +31,7 @@ model Donation {
 
   // Donation Details
   donationType     DonationType @map("donation_type")
-  pledgeAmount     Decimal      @db.Decimal(18, 8) @map("pledgeAmount")
+  pledgeAmount     Decimal      @db.Decimal(18, 8) @map("pledge_amount")
   assetSymbol      String?      @map("asset_symbol")
   assetDescription String?      @map("asset_description")
 
