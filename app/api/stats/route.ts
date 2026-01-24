@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
       
       // Test database connection first
       try {
-        await prisma.$queryRaw`SELECT 1 as test`
+        const testResult = await prisma.$queryRaw<{ test: number }[]>`SELECT 1 as test`
+        console.log('[stats] Database connection test:', testResult)
       } catch (dbError) {
         console.error('[stats] Database connection failed:', dbError)
         if (debugInfo) {
@@ -78,7 +79,8 @@ export async function GET(request: NextRequest) {
             message: dbError instanceof Error ? dbError.message : String(dbError),
           })
         }
-        // Continue anyway - might be a temporary issue
+        // If connection fails, return early with defaults
+        throw dbError
       }
 
       if (debugInfo) {
@@ -235,6 +237,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        console.log('[stats] Executing donations query...')
         const rows = await prisma.$queryRaw<
           {
             sum_success: number | null
@@ -410,10 +413,12 @@ export async function GET(request: NextRequest) {
 
         // Your DB uses camelCase columns ("matchedAmount") as shown in debug output.
         // Note: Column name must be quoted because it's camelCase
+        console.log('[stats] Executing matching donations query...')
         const matchedRows = await prisma.$queryRaw<{ total: number | null }[]>`
           SELECT SUM("matchedAmount")::float AS total
           FROM "MatchingDonationLog"
         `
+        console.log('[stats] Matching query raw result:', matchedRows)
         donationsMatched = matchedRows?.[0]?.total ?? null
         // Convert null to 0 if needed, but keep null to distinguish from "no data"
         if (donationsMatched === null) {
