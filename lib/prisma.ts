@@ -53,6 +53,11 @@ if (process.env.NODE_ENV !== 'production') {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Increase timeout for Cloudflare tunnel connections
+  connectionTimeoutMillis: 30000, // 30 seconds
+  // Keep connections alive longer
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 })
 
 const adapter = new PrismaPg(pool)
