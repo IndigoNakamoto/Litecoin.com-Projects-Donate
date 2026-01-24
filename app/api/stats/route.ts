@@ -14,7 +14,7 @@ interface Stats {
 
 export async function GET(request: NextRequest) {
   // Bump cache key to avoid serving previously cached incorrect values
-  const cacheKey = 'stats:all:v4'
+  const cacheKey = 'stats:all:v6'
   const debug =
     process.env.NODE_ENV !== 'production' &&
     request.nextUrl.searchParams.get('debug') === '1'
