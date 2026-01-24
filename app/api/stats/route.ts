@@ -14,7 +14,7 @@ interface Stats {
 
 export async function GET(request: NextRequest) {
   // Bump cache key to avoid serving previously cached incorrect values
-  const cacheKey = 'stats:all:v3'
+  const cacheKey = 'stats:all:v4'
   const debug =
     process.env.NODE_ENV !== 'production' &&
     request.nextUrl.searchParams.get('debug') === '1'
@@ -317,8 +317,9 @@ export async function GET(request: NextRequest) {
           donationsRaised = sumAny
           if (debugInfo) debugInfo.used = 'legacy:donations(any)'
         }
-      } catch {
+      } catch (error) {
         // Table doesn't exist (or column differs) in the new schema — ignore.
+        console.error('[stats] Error querying donations table:', error)
       }
 
       if (donationsRaised === 0) {
@@ -398,7 +399,11 @@ export async function GET(request: NextRequest) {
           SELECT SUM("matchedAmount")::float AS total
           FROM "MatchingDonationLog"
         `
-        donationsMatched = matchedRows?.[0]?.total ?? 0
+        donationsMatched = matchedRows?.[0]?.total ?? null
+        // Convert null to 0 if needed, but keep null to distinguish from "no data"
+        if (donationsMatched === null) {
+          donationsMatched = 0
+        }
 
         if (debugInfo) {
           const prev =
@@ -407,7 +412,8 @@ export async function GET(request: NextRequest) {
               : {}
           debugInfo.legacyMatching = { ...prev, sum: donationsMatched }
         }
-      } catch {
+      } catch (error) {
+        console.error('[stats] Error querying MatchingDonationLog:', error)
         donationsMatched = null
       }
     } catch {
