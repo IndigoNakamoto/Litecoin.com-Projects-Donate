@@ -66,6 +66,20 @@ export async function GET(request: NextRequest) {
 
     try {
       const { prisma } = await import('@/lib/prisma')
+      
+      // Test database connection first
+      try {
+        await prisma.$queryRaw`SELECT 1 as test`
+      } catch (dbError) {
+        console.error('[stats] Database connection failed:', dbError)
+        if (debugInfo) {
+          ;(debugInfo.errors as unknown[]).push({
+            where: 'database-connection-test',
+            message: dbError instanceof Error ? dbError.message : String(dbError),
+          })
+        }
+        // Continue anyway - might be a temporary issue
+      }
 
       if (debugInfo) {
         try {
