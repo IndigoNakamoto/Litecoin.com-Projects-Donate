@@ -419,6 +419,12 @@ export async function GET(request: NextRequest) {
         if (donationsMatched === null) {
           donationsMatched = 0
         }
+        
+        // Log the matched amount for debugging
+        console.log('[stats] Matching donations query result:', {
+          rawTotal: matchedRows?.[0]?.total,
+          donationsMatched,
+        })
 
         if (debugInfo) {
           const prev =
@@ -429,6 +435,12 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         console.error('[stats] Error querying MatchingDonationLog:', error)
+        if (debugInfo) {
+          ;(debugInfo.errors as unknown[]).push({
+            where: 'legacy:MatchingDonationLog-query',
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
         donationsMatched = null
       }
     } catch {
@@ -443,6 +455,14 @@ export async function GET(request: NextRequest) {
       donationsRaised,
       donationsMatched,
     }
+    
+    // Log final stats for debugging
+    console.log('[stats] Final stats:', {
+      projectsSupported,
+      totalPaid,
+      donationsRaised,
+      donationsMatched,
+    })
 
     // Cache the stats for 10 minutes
     try {
