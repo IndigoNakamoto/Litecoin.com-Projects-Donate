@@ -409,6 +409,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Your DB uses camelCase columns ("matchedAmount") as shown in debug output.
+        // Note: Column name must be quoted because it's camelCase
         const matchedRows = await prisma.$queryRaw<{ total: number | null }[]>`
           SELECT SUM("matchedAmount")::float AS total
           FROM "MatchingDonationLog"
