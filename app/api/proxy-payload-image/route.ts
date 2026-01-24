@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     payloadOrigin,
     'http://localhost:3011',
     'http://127.0.0.1:3011',
+    'https://projectscms.lite.space',
   ])
 
   if (!allowedOrigins.has(parsed.origin)) {

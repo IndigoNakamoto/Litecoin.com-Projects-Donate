@@ -54,11 +54,24 @@ export const optimizeWebflowImageUrl = (
 }
 
 export const customImageLoader = ({ src, width, quality }: { src: string; width: number; quality?: number }) => {
-  // Proxy Payload CMS localhost images through Next.js API to avoid blocking
-  if (src.includes('localhost:3011') || src.includes('127.0.0.1:3011')) {
-    // Use Next.js proxy route for localhost images
-    const proxyUrl = `/api/proxy-payload-image?url=${encodeURIComponent(src)}`
-    // With unoptimized: true, we can return the proxied URL directly
+  // Proxy Payload CMS images through Next.js API to avoid CORS and blocking issues
+  // This works for both localhost and production Payload CMS URLs
+  const payloadCmsUrl = process.env.NEXT_PUBLIC_PAYLOAD_CMS_URL || process.env.PAYLOAD_CMS_URL || 'http://localhost:3011'
+  const isPayloadImage = 
+    src.includes('localhost:3011') || 
+    src.includes('127.0.0.1:3011') ||
+    src.includes('projectscms.lite.space') ||
+    src.startsWith('/api/media/') // Relative Payload CMS URLs
+  
+  if (isPayloadImage) {
+    // Use Next.js proxy route for Payload CMS images
+    // Handle both absolute and relative URLs
+    let imageUrl = src
+    if (src.startsWith('/api/media/')) {
+      // Relative URL - prepend Payload CMS base URL
+      imageUrl = `${payloadCmsUrl.replace(/\/+$/, '')}${src}`
+    }
+    const proxyUrl = `/api/proxy-payload-image?url=${encodeURIComponent(imageUrl)}`
     return proxyUrl
   }
 

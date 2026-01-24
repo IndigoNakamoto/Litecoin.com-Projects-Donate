@@ -67,6 +67,12 @@ const nextConfig: NextConfig = {
         port: '3011',
         pathname: '/api/media/**',
       },
+      // Payload CMS production (via Cloudflare tunnel)
+      {
+        protocol: 'https',
+        hostname: 'projectscms.lite.space',
+        pathname: '/api/media/**',
+      },
     ],
   },
   async headers() {
