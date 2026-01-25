@@ -162,60 +162,20 @@ export async function GET(request: NextRequest) {
       // KV might not be available, continue without cache
     }
 
-    // Get all donor IDs who have matched donations for this project
-    let matchingDonations: { donorId: string }[] = []
-    try {
-      matchingDonations = await prisma.matchingDonationLog.findMany({
-        where: {
-          projectSlug: slug,
-        },
-        select: {
-          donorId: true,
-        },
-        distinct: ['donorId'],
-      })
-    } catch (error) {
-      console.warn('[Matching Donors] Error querying MatchingDonationLog:', error)
-      return NextResponse.json([])
+    // Call database API instead of direct database access
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const response = await fetch(`${apiUrl}/api/matching/donors-by-project?slug=${encodeURIComponent(slug)}`)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[Matching Donors] API returned ${response.status}: ${errorText}`)
+      return NextResponse.json(
+        { error: 'Failed to fetch matching donors from API' },
+        { status: response.status }
+      )
     }
 
-    const donorIds = matchingDonations.map((d) => d.donorId)
-
-    if (donorIds.length === 0) {
-      return NextResponse.json([])
-    }
-
-    // Get total matched amounts per donor for this project
-    const totalMatchedAmounts = await prisma.matchingDonationLog.groupBy({
-      by: ['donorId'],
-      where: {
-        projectSlug: slug,
-      },
-      _sum: {
-        matchedAmount: true,
-      },
-    }).catch((error) => {
-      console.warn('[Matching Donors] Error grouping matched amounts:', error)
-      return []
-    })
-
-    // Build map of donorId -> total matched amount
-    const totalMatchedAmountMap: Record<string, number> = {}
-    for (const item of totalMatchedAmounts) {
-      const amount = item._sum.matchedAmount?.toNumber() ?? 0
-      totalMatchedAmountMap[item.donorId] = Math.round(amount * 100) / 100
-    }
-
-    // Fetch donor details from appropriate source
-    let result: MatchingDonorResponse[]
-    
-    if (usePayloadCMS()) {
-      console.log('[Matching Donors] Using Payload CMS')
-      result = await getMatchingDonorsFromPayload(donorIds, totalMatchedAmountMap)
-    } else {
-      console.log('[Matching Donors] Using Webflow (legacy)')
-      result = await getMatchingDonorsFromWebflow(donorIds, totalMatchedAmountMap)
-    }
+    const result = await response.json()
 
     // Cache the result
     try {

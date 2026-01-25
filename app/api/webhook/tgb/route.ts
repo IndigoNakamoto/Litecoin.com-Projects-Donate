@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { processDonationMatchingWithPayload } from '@/services/matching'
+// Matching now handled by database API
 
 // Define Webhook Event Types
 type WebhookEventType = 'DEPOSIT_TRANSACTION' | 'TRANSACTION_CONVERTED' | string
@@ -369,14 +369,25 @@ export async function POST(request: NextRequest) {
     const handlerFunction = eventHandlers[eventType] || handleUnknownEvent
     await handlerFunction(eventType, decryptedPayload)
 
-    // Trigger matching process (non-blocking)
+    // Trigger matching process via database API (non-blocking)
     // We don't await this to avoid delaying the webhook response
-    processDonationMatchingWithPayload()
-      .then((result) => {
-        console.log(`[TGB Webhook] Matching completed: processed=${result.processed}, matched=${result.matched}`)
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    fetch(`${apiUrl}/api/matching/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: false }),
+    })
+      .then(async (response) => {
+        if (response.ok) {
+          const result = await response.json()
+          console.log(`[TGB Webhook] Matching completed: processed=${result.processed}, matched=${result.matched}`)
+        } else {
+          const errorText = await response.text()
+          console.error(`[TGB Webhook] Matching API returned ${response.status}: ${errorText}`)
+        }
       })
       .catch((error) => {
-        console.error('[TGB Webhook] Matching failed:', error)
+        console.error('[TGB Webhook] Matching API call failed:', error)
       })
 
     return NextResponse.json({ message: 'Webhook processed successfully' })

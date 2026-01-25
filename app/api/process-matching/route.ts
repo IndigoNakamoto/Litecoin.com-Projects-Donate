@@ -1,12 +1,12 @@
 // app/api/process-matching/route.ts
 // Manual trigger endpoint for the donation matching process
+// Now uses database API instead of direct database access
 
 import { NextRequest, NextResponse } from 'next/server'
-import { processDonationMatchingWithPayload } from '@/services/matching'
 
 /**
  * POST /api/process-matching
- * Manually trigger the matching process
+ * Manually trigger the matching process via database API
  * 
  * Request body (optional):
  * {
@@ -23,28 +23,33 @@ export async function POST(request: NextRequest) {
     }
     
     const dryRun = body.dryRun === true
-    const minDate = body.minDate ? new Date(body.minDate) : undefined
+    const minDate = body.minDate
 
     // Validate minDate if provided
-    if (body.minDate && minDate && isNaN(minDate.getTime())) {
+    if (minDate && new Date(minDate) && isNaN(new Date(minDate).getTime())) {
       return NextResponse.json(
         { error: 'Invalid minDate format. Use ISO 8601 format (e.g., 2025-01-01T00:00:00Z)' },
         { status: 400 }
       )
     }
 
-    console.log(`[Process Matching] Starting${dryRun ? ' (dry run)' : ''}`)
+    console.log(`[Process Matching] Calling database API${dryRun ? ' (dry run)' : ''}`)
     
-    const result = await processDonationMatchingWithPayload({ dryRun, minDate })
-
-    return NextResponse.json({
-      success: true,
-      message: dryRun ? 'Dry run completed' : 'Matching process completed',
-      processed: result.processed,
-      matched: result.matched,
-      totalMatchedAmount: result.totalMatchedAmount,
-      errors: result.errors.length > 0 ? result.errors : undefined,
+    // Call database API
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const response = await fetch(`${apiUrl}/api/matching/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun, minDate }),
     })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`API returned ${response.status}: ${errorText}`)
+    }
+
+    const result = await response.json()
+    return NextResponse.json(result)
   } catch (error) {
     console.error('[Process Matching] Error:', error)
     return NextResponse.json(
@@ -70,30 +75,33 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     // Default to dry run for GET requests (safer for manual testing)
     const dryRun = searchParams.get('dryRun') !== 'false'
-    const minDateStr = searchParams.get('minDate')
-    const minDate = minDateStr ? new Date(minDateStr) : undefined
+    const minDate = searchParams.get('minDate') || undefined
 
     // Validate minDate if provided
-    if (minDateStr && minDate && isNaN(minDate.getTime())) {
+    if (minDate && new Date(minDate) && isNaN(new Date(minDate).getTime())) {
       return NextResponse.json(
         { error: 'Invalid minDate format. Use ISO 8601 format (e.g., 2025-01-01)' },
         { status: 400 }
       )
     }
 
-    console.log(`[Process Matching] Starting via GET${dryRun ? ' (dry run)' : ''}`)
+    console.log(`[Process Matching] Calling database API via GET${dryRun ? ' (dry run)' : ''}`)
     
-    const result = await processDonationMatchingWithPayload({ dryRun, minDate })
-
-    return NextResponse.json({
-      success: true,
-      message: dryRun ? 'Dry run completed' : 'Matching process completed',
-      dryRun,
-      processed: result.processed,
-      matched: result.matched,
-      totalMatchedAmount: result.totalMatchedAmount,
-      errors: result.errors.length > 0 ? result.errors : undefined,
+    // Call database API
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const response = await fetch(`${apiUrl}/api/matching/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun, minDate }),
     })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`API returned ${response.status}: ${errorText}`)
+    }
+
+    const result = await response.json()
+    return NextResponse.json(result)
   } catch (error) {
     console.error('[Process Matching] Error:', error)
     return NextResponse.json(
