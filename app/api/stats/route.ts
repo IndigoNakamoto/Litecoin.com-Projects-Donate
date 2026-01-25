@@ -48,13 +48,13 @@ export async function GET(request: NextRequest) {
     const projectsSupported = projects.length
 
     // Calculate donations raised and matched
-    // Use lazy import so the route still works even if Prisma isn't configured yet.
+    // Try API first, fallback to direct database if API unavailable
     let donationsRaised = 0
     let donationsMatched: number | null = null
 
     const debugInfo: Record<string, unknown> | undefined = debug
       ? {
-          version: 'stats-debug-v5',
+          version: 'stats-debug-v6-api',
           used: null,
           tables: null,
           donationPledge: null,
@@ -64,8 +64,35 @@ export async function GET(request: NextRequest) {
         }
       : undefined
 
+    // Try to fetch from database API first
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
     try {
-      const { prisma } = await import('@/lib/prisma')
+      console.log('[stats] Fetching from database API:', apiUrl)
+      const apiResponse = await fetch(`${apiUrl}/api/stats`, {
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+      })
+      
+      if (apiResponse.ok) {
+        const apiStats = await apiResponse.json()
+        donationsRaised = apiStats.donationsRaised || 0
+        donationsMatched = apiStats.donationsMatched ?? null
+        console.log('[stats] API response:', { donationsRaised, donationsMatched })
+        if (debugInfo) debugInfo.used = 'database-api'
+      } else {
+        throw new Error(`API returned ${apiResponse.status}`)
+      }
+    } catch (apiError) {
+      console.warn('[stats] Database API failed, falling back to direct database:', apiError)
+      if (debugInfo) {
+        ;(debugInfo.errors as unknown[]).push({
+          where: 'database-api',
+          message: apiError instanceof Error ? apiError.message : String(apiError),
+        })
+      }
+      
+      // Fallback to direct database connection
+      try {
+        const { prisma } = await import('@/lib/prisma')
       
       // Test database connection first
       try {
