@@ -475,10 +475,16 @@ export async function GET(request: NextRequest) {
         }
         donationsMatched = null
       }
-    } catch {
-      // Prisma not configured / database unavailable: keep defaults.
-      donationsRaised = 0
-      donationsMatched = null
+      } catch (fallbackError) {
+        console.error('[stats] Direct database fallback also failed:', fallbackError)
+        if (debugInfo) {
+          ;(debugInfo.errors as unknown[]).push({
+            where: 'database-fallback',
+            message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          })
+        }
+        // Keep defaults (0 and null)
+      }
     }
 
     const stats: Stats = {
