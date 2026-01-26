@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
 
     // Call database API
     const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
-    const response = await fetch(`${apiUrl}/api/projects/${encodeURIComponent(slug)}/stats`)
+    const response = await fetch(`${apiUrl}/api/projects/${encodeURIComponent(slug)}/stats`, {
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    })
 
     if (!response.ok) {
       if (response.status === 404) {
