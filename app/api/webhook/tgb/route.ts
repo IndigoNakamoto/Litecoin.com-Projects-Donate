@@ -4,8 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { prisma } from '@/lib/prisma'
-// Matching now handled by database API
+// Matching and database operations now handled by database API
 
 // Define Webhook Event Types
 type WebhookEventType = 'DEPOSIT_TRANSACTION' | 'TRANSACTION_CONVERTED' | string
@@ -81,6 +80,50 @@ function decryptPayload(encryptedHex: string): DecryptedPayload {
 }
 
 /**
+ * Helper function to fetch donation by pledgeId or donationUuid via API
+ */
+async function fetchDonationByPledgeOrUuid(pledgeId?: string, donationUuid?: string): Promise<any> {
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  
+  if (pledgeId) {
+    const response = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return data.donation
+    }
+  }
+  
+  if (donationUuid) {
+    const response = await fetch(`${apiUrl}/api/donations/by-donation-uuid/${encodeURIComponent(donationUuid)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return data.donation
+    }
+  }
+  
+  return null
+}
+
+/**
+ * Helper function to check if webhook event exists via API
+ */
+async function checkWebhookEventExists(eid: string): Promise<boolean> {
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  try {
+    const response = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/**
  * Handler for DEPOSIT_TRANSACTION event
  */
 async function handleDepositTransaction(
@@ -94,9 +137,7 @@ async function handleDepositTransaction(
   }
 
   // Check if the event has already been processed (idempotency)
-  const existingEvent = await prisma.webhookEvent.findUnique({
-    where: { eid },
-  })
+  const existingEvent = await checkWebhookEventExists(eid)
 
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
@@ -104,16 +145,7 @@ async function handleDepositTransaction(
   }
 
   // Find the associated Donation
-  let donation = null
-  if (pledgeId) {
-    donation = await prisma.donation.findUnique({
-      where: { pledgeId },
-    })
-  } else if (donationUuid) {
-    donation = await prisma.donation.findUnique({
-      where: { donationUuid },
-    })
-  }
+  const donation = await fetchDonationByPledgeOrUuid(pledgeId, donationUuid)
 
   if (!donation) {
     throw new Error(
@@ -122,44 +154,57 @@ async function handleDepositTransaction(
   }
 
   // Prepare update data
-  const existingEventData = (donation.eventData as Record<string, unknown>) || {}
+  const existingEventData = (donation.event_data as Record<string, unknown>) || {}
   
-  // Update the Donation record
-  await prisma.donation.update({
-    where: { id: donation.id },
-    data: {
+  // Update the Donation record via API
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       transactionHash: payload.transactionHash || null,
       payoutAmount: payload.payoutAmount,
       payoutCurrency: payload.payoutCurrency,
       externalId: payload.externalId,
       campaignId: payload.campaignId,
-      valueAtDonationTimeUSD: payload.valueAtDonationTimeUSD || donation.valueAtDonationTimeUSD,
+      valueAtDonationTimeUSD: payload.valueAtDonationTimeUSD || donation.value_at_donation_time_usd,
       currency: payload.currency,
       amount: payload.amount,
       status: payload.status,
-      timestampms: new Date(Number(payload.timestampms)),
+      timestampms: new Date(Number(payload.timestampms)).toISOString(),
       eid: payload.eid,
       paymentMethod: payload.paymentMethod,
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      } as any, // Cast to any to satisfy Prisma Json type
-      updatedAt: new Date(),
-    },
+      },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
 
-  // Create WebhookEvent record
-  await prisma.webhookEvent.upsert({
-    where: { eid },
-    update: { processed: true },
-    create: {
+  if (!updateResponse.ok) {
+    const errorText = await updateResponse.text()
+    throw new Error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
+  }
+
+  // Upsert WebhookEvent record via API
+  const webhookResponse = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       eventType: 'DEPOSIT_TRANSACTION',
-      payload: payload as any, // Cast to any to satisfy Prisma Json type
+      payload: payload,
       donationId: donation.id,
-      eid: payload.eid,
       processed: true,
-    },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
+
+  if (!webhookResponse.ok) {
+    const errorText = await webhookResponse.text()
+    console.error(`Failed to create/update webhook event: ${webhookResponse.status} ${errorText}`)
+    // Don't throw - donation update succeeded
+  }
 
   console.log(`[TGB Webhook] Processed DEPOSIT_TRANSACTION: eid=${eid}, pledgeId=${pledgeId}, donationUuid=${donationUuid}`)
 }
@@ -178,9 +223,7 @@ async function handleTransactionConverted(
   }
 
   // Check if the event has already been processed (idempotency)
-  const existingEvent = await prisma.webhookEvent.findUnique({
-    where: { eid },
-  })
+  const existingEvent = await checkWebhookEventExists(eid)
 
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
@@ -188,22 +231,22 @@ async function handleTransactionConverted(
   }
 
   // Find the associated Donation
-  const donation = await prisma.donation.findUnique({
-    where: { pledgeId },
-  })
+  const donation = await fetchDonationByPledgeOrUuid(pledgeId)
 
   if (!donation) {
     throw new Error(`Donation with pledgeId ${pledgeId} not found`)
   }
 
   // Prepare update data
-  const existingEventData = (donation.eventData as Record<string, unknown>) || {}
+  const existingEventData = (donation.event_data as Record<string, unknown>) || {}
 
-  // Update the Donation record
-  await prisma.donation.update({
-    where: { pledgeId },
-    data: {
-      convertedAt: new Date(Number(payload.convertedAt)),
+  // Update the Donation record via API
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const updateResponse = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      convertedAt: new Date(Number(payload.convertedAt)).toISOString(),
       netValueAmount: payload.netValueAmount,
       grossAmount: payload.grossAmount,
       netValueCurrency: payload.netValueCurrency,
@@ -215,26 +258,40 @@ async function handleTransactionConverted(
       currency: payload.currency,
       amount: payload.amount,
       status: payload.status,
-      timestampms: new Date(Number(payload.timestampms)),
+      timestampms: new Date(Number(payload.timestampms)).toISOString(),
       eid: payload.eid,
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      } as any, // Cast to any to satisfy Prisma Json type
-      updatedAt: new Date(),
-    },
+      },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
 
-  // Create WebhookEvent record
-  await prisma.webhookEvent.create({
-    data: {
+  if (!updateResponse.ok) {
+    const errorText = await updateResponse.text()
+    throw new Error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
+  }
+
+  // Create WebhookEvent record via API
+  const webhookResponse = await fetch(`${apiUrl}/api/webhook-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       eventType: 'TRANSACTION_CONVERTED',
-      payload: payload as any, // Cast to any to satisfy Prisma Json type
+      payload: payload,
       donationId: donation.id,
       eid: payload.eid,
       processed: true,
-    },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
+
+  if (!webhookResponse.ok) {
+    const errorText = await webhookResponse.text()
+    console.error(`Failed to create webhook event: ${webhookResponse.status} ${errorText}`)
+    // Don't throw - donation update succeeded
+  }
 
   console.log(`[TGB Webhook] Processed TRANSACTION_CONVERTED: eid=${eid}, pledgeId=${pledgeId}`)
 }
@@ -256,9 +313,7 @@ async function handleUnknownEvent(
   }
 
   // Check if the event has already been processed (idempotency)
-  const existingEvent = await prisma.webhookEvent.findUnique({
-    where: { eid },
-  })
+  const existingEvent = await checkWebhookEventExists(eid)
 
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
@@ -266,16 +321,7 @@ async function handleUnknownEvent(
   }
 
   // Find the associated Donation
-  let donation = null
-  if (pledgeId) {
-    donation = await prisma.donation.findUnique({
-      where: { pledgeId },
-    })
-  } else if (donationUuid) {
-    donation = await prisma.donation.findUnique({
-      where: { donationUuid },
-    })
-  }
+  const donation = await fetchDonationByPledgeOrUuid(pledgeId, donationUuid)
 
   if (!donation) {
     console.warn(`[TGB Webhook] Donation not found for unknown event: pledgeId=${pledgeId}, donationUuid=${donationUuid}`)
@@ -283,29 +329,46 @@ async function handleUnknownEvent(
   }
 
   // Update the Donation's eventData with the unknown event
-  const existingEventData = (donation.eventData as Record<string, unknown>) || {}
+  const existingEventData = (donation.event_data as Record<string, unknown>) || {}
   
-  await prisma.donation.update({
-    where: { id: donation.id },
-    data: {
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       eventData: {
         ...existingEventData,
         [eventType]: payload,
-      } as any, // Cast to any to satisfy Prisma Json type
-      updatedAt: new Date(),
-    },
+      },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
 
-  // Create WebhookEvent record
-  await prisma.webhookEvent.create({
-    data: {
+  if (!updateResponse.ok) {
+    const errorText = await updateResponse.text()
+    console.error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
+    // Don't throw - continue to create webhook event
+  }
+
+  // Create WebhookEvent record via API
+  const webhookResponse = await fetch(`${apiUrl}/api/webhook-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       eventType,
-      payload: payload as any, // Cast to any to satisfy Prisma Json type
+      payload: payload,
       donationId: donation.id,
       eid,
       processed: true,
-    },
+    }),
+    signal: AbortSignal.timeout(10000),
   })
+
+  if (!webhookResponse.ok) {
+    const errorText = await webhookResponse.text()
+    console.error(`Failed to create webhook event: ${webhookResponse.status} ${errorText}`)
+    // Don't throw - donation update may have succeeded
+  }
 
   console.log(`[TGB Webhook] Processed unknown event: type=${eventType}, eid=${eid}`)
 }

@@ -4,7 +4,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
-import { prisma } from '@/lib/prisma'
 import { createWebflowClient, listCollectionItems } from '@/services/webflow/client'
 import { createPayloadClient, fetchAllPages } from '@/services/payload/client'
 import type { PayloadMatchingDonor } from '@/services/matching'

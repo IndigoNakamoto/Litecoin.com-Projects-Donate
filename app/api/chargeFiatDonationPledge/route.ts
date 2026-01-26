@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { createTGBClient } from '@/services/tgb/client'
 import axios from 'axios'
 
@@ -37,10 +36,19 @@ export async function POST(request: NextRequest) {
     const success = Boolean(chargeResponse?.data?.data?.success)
 
     // Parity with old project: update Donation.success by pledgeId
-    await prisma.donation.update({
-      where: { pledgeId },
-      data: { success: success || false },
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const updateResponse = await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: success || false }),
+      signal: AbortSignal.timeout(10000),
     })
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text()
+      console.error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
+      // Don't fail the request if update fails
+    }
 
     return NextResponse.json({ success })
   } catch (error: any) {
@@ -54,12 +62,15 @@ export async function POST(request: NextRequest) {
 
       // Parity with old project: best-effort mark donation as failed
       try {
-        await prisma.donation.update({
-          where: { pledgeId },
-          data: { success: false },
+        const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+        await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false }),
+          signal: AbortSignal.timeout(10000),
         })
       } catch (dbErr) {
-        console.error('Error updating donation failure status in Prisma:', dbErr)
+        console.error('Error updating donation failure status:', dbErr)
       }
 
       return NextResponse.json(
@@ -70,12 +81,15 @@ export async function POST(request: NextRequest) {
 
     // Parity with old project: best-effort mark donation as failed
     try {
-      await prisma.donation.update({
-        where: { pledgeId },
-        data: { success: false },
+      const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+      await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false }),
+        signal: AbortSignal.timeout(10000),
       })
     } catch (dbErr) {
-      console.error('Error updating donation failure status in Prisma:', dbErr)
+      console.error('Error updating donation failure status:', dbErr)
     }
 
     return NextResponse.json(

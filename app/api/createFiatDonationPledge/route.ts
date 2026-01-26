@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Decimal from 'decimal.js'
-import { prisma } from '@/lib/prisma'
 import { createTGBClient } from '@/services/tgb/client'
 
 export async function POST(request: NextRequest) {
@@ -69,13 +68,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Parity with old project: create Donation record first (without pledgeId)
-    const donation = await prisma.donation.create({
-      data: {
+    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const createResponse = await fetch(`${apiUrl}/api/donations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         projectSlug,
         organizationId,
         donationType: 'fiat',
         assetSymbol: pledgeCurrency,
-        pledgeAmount: parsedPledgeAmount,
+        pledgeAmount: parsedPledgeAmount.toString(),
         firstName: firstName || null,
         lastName: lastName || null,
         donorEmail: receiptEmail || null,
@@ -85,8 +87,16 @@ export async function POST(request: NextRequest) {
         socialX: socialX || null,
         socialFacebook: socialFacebook || null,
         socialLinkedIn: socialLinkedIn || null,
-      },
+      }),
+      signal: AbortSignal.timeout(10000),
     })
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text()
+      throw new Error(`Failed to create donation: ${createResponse.status} ${errorText}`)
+    }
+
+    const { donation } = await createResponse.json()
 
     const client = await createTGBClient()
 
@@ -124,10 +134,18 @@ export async function POST(request: NextRequest) {
     const { pledgeId } = response.data.data
 
     // Parity with old project: update Donation with returned pledgeId
-    await prisma.donation.update({
-      where: { id: donation.id },
-      data: { pledgeId },
+    const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pledgeId }),
+      signal: AbortSignal.timeout(10000),
     })
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text()
+      console.error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
+      // Don't fail the request if update fails - donation is already created
+    }
 
     return NextResponse.json({ pledgeId })
   } catch (error: any) {
