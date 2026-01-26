@@ -38,9 +38,12 @@ export async function getAccessToken(): Promise<string> {
     if (
       error?.code === 'P1001' || 
       error?.code === 'P2021' || // Table does not exist
+      error?.code === 'ETIMEDOUT' || // Connection timeout
       error?.message?.includes('Environment variable not found') || 
       error?.message?.includes('Can\'t reach database server') ||
-      error?.message?.includes('does not exist in the current database')
+      error?.message?.includes('does not exist in the current database') ||
+      error?.message?.includes('timeout') ||
+      error?.message?.includes('ETIMEDOUT')
     ) {
       console.warn('Database unavailable or table missing, attempting login without token cache:', error.message)
       // If database is unavailable or table doesn't exist, try to login directly
@@ -91,9 +94,12 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
         if (
           dbError?.code === 'P1001' || 
           dbError?.code === 'P2021' || // Table does not exist
+          dbError?.code === 'ETIMEDOUT' || // Connection timeout
           dbError?.message?.includes('Environment variable not found') || 
           dbError?.message?.includes('Can\'t reach database server') ||
-          dbError?.message?.includes('does not exist in the current database')
+          dbError?.message?.includes('does not exist in the current database') ||
+          dbError?.message?.includes('timeout') ||
+          dbError?.message?.includes('ETIMEDOUT')
         ) {
           console.warn('Database unavailable or table missing, skipping token cache update')
         } else {
@@ -160,9 +166,12 @@ async function loginAndSaveTokens(): Promise<string> {
         if (
           dbError?.code === 'P1001' || 
           dbError?.code === 'P2021' || // Table does not exist
+          dbError?.code === 'ETIMEDOUT' || // Connection timeout
           dbError?.message?.includes('Environment variable not found') || 
           dbError?.message?.includes('Can\'t reach database server') ||
-          dbError?.message?.includes('does not exist in the current database')
+          dbError?.message?.includes('does not exist in the current database') ||
+          dbError?.message?.includes('timeout') ||
+          dbError?.message?.includes('ETIMEDOUT')
         ) {
           console.warn('Database unavailable or table missing, skipping token cache update')
         } else {
