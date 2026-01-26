@@ -262,15 +262,28 @@ export async function getAllPublishedProjects(): Promise<Project[]> {
 export async function getProjectBySlug(slug: string): Promise<Project | null> {
   const client = createPayloadClient()
   
-  // Try to get from cache first
+  // Try to get from cache first (skip if FORCE_REFRESH_PAYLOAD is set)
   const cacheKey = `payload:project:${slug}`
-  try {
-    const cached = await kv.get<Project>(cacheKey)
-    if (cached) {
-      return cached
+  const forceRefresh = process.env.FORCE_REFRESH_PAYLOAD === 'true'
+  
+  if (!forceRefresh) {
+    try {
+      const cached = await kv.get<Project>(cacheKey)
+      if (cached) {
+        return cached
+      }
+    } catch (error) {
+      // KV not available, continue
     }
-  } catch (error) {
-    // KV not available, continue
+  } else {
+    console.log(`[getProjectBySlug] FORCE_REFRESH_PAYLOAD=true, skipping cache for project "${slug}"`)
+    // Clear the cache when forcing refresh
+    try {
+      await kv.del(cacheKey)
+      console.log(`[getProjectBySlug] Cleared cache for project "${slug}"`)
+    } catch (error) {
+      // KV not available, continue
+    }
   }
 
   try {
@@ -300,11 +313,13 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
     const payloadProject = docs[0] as PayloadProject
     const project = await transformProject(payloadProject, true)
 
-    // Cache the result
-    try {
-      await kv.set(cacheKey, project, { ex: CACHE_TTL })
-    } catch (error) {
-      // KV not available, continue
+    // Cache the result (unless forcing refresh, in which case we already cleared it)
+    if (!forceRefresh) {
+      try {
+        await kv.set(cacheKey, project, { ex: CACHE_TTL })
+      } catch (error) {
+        // KV not available, continue
+      }
     }
 
     return project
