@@ -142,6 +142,8 @@ async function transformProject(
     recurring: payloadProject.recurring,
     totalPaid: payloadProject.totalPaid,
     serviceFeesCollected: payloadProject.serviceFeesCollected,
+    litecoinRaised: payloadProject.litecoinRaised ?? 0,
+    litecoinPaid: payloadProject.litecoinPaid ?? 0,
     website: payloadProject.website,
     github: payloadProject.github,
     twitter: payloadProject.twitter,

@@ -82,7 +82,7 @@ const StandardStats: React.FC<
           {litecoinRaised > 0 && (
             <StatItem
               value={`Ł ${formattedCommunityLtc}`}
-              label="Community Donations (LTC)"
+              label="Community Raised (LTC)"
             />
           )}
           <StatItem

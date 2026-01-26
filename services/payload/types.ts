@@ -19,6 +19,8 @@ export interface PayloadProject {
   recurring: boolean
   totalPaid: number
   serviceFeesCollected: number
+  litecoinRaised?: number
+  litecoinPaid?: number
   website?: string
   github?: string
   twitter?: string
