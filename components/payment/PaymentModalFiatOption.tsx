@@ -30,6 +30,10 @@ export default function PaymentModalFiatOption() {
       type: 'SET_FORM_DATA',
       payload: { pledgeAmount: amount.toString(), pledgeCurrency: 'USD' },
     })
+    dispatch({
+      type: 'SET_DONATION_DATA',
+      payload: { pledgeAmount: amount.toString(), pledgeCurrency: 'USD' },
+    })
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +45,10 @@ export default function PaymentModalFiatOption() {
       setSelectedAmount(null) // Reset selectedAmount as user is entering a custom value
       dispatch({
         type: 'SET_FORM_DATA',
+        payload: { pledgeAmount: value, pledgeCurrency: 'USD' },
+      })
+      dispatch({
+        type: 'SET_DONATION_DATA',
         payload: { pledgeAmount: value, pledgeCurrency: 'USD' },
       })
     }
@@ -69,11 +77,22 @@ export default function PaymentModalFiatOption() {
               pledgeCurrency: 'USD',
             },
           })
+          dispatch({
+            type: 'SET_DONATION_DATA',
+            payload: {
+              pledgeAmount: matchingAmount.toString(),
+              pledgeCurrency: 'USD',
+            },
+          })
         } else {
           setCustomAmount(formattedAmount)
           setSelectedAmount(null) // No matching predefined amount
           dispatch({
             type: 'SET_FORM_DATA',
+            payload: { pledgeAmount: formattedAmount, pledgeCurrency: 'USD' },
+          })
+          dispatch({
+            type: 'SET_DONATION_DATA',
             payload: { pledgeAmount: formattedAmount, pledgeCurrency: 'USD' },
           })
         }
@@ -83,6 +102,10 @@ export default function PaymentModalFiatOption() {
         setSelectedAmount(null)
         dispatch({
           type: 'SET_FORM_DATA',
+          payload: { pledgeAmount: '', pledgeCurrency: 'USD' },
+        })
+        dispatch({
+          type: 'SET_DONATION_DATA',
           payload: { pledgeAmount: '', pledgeCurrency: 'USD' },
         })
       }
@@ -99,6 +122,10 @@ export default function PaymentModalFiatOption() {
         type: 'SET_FORM_DATA',
         payload: { pledgeAmount: totalAmount, pledgeCurrency: 'USD' },
       }) // Adjust for fees
+      dispatch({
+        type: 'SET_DONATION_DATA',
+        payload: { pledgeAmount: totalAmount, pledgeCurrency: 'USD' },
+      })
     } else if (coverFees && inputRef.current) {
       const baseAmount = parseFloat(customAmount) / 1.030928
       setCustomAmount(baseAmount.toFixed(2))
@@ -106,6 +133,13 @@ export default function PaymentModalFiatOption() {
         type: 'SET_FORM_DATA',
         payload: { pledgeAmount: baseAmount.toFixed(2), pledgeCurrency: 'USD' },
       }) // Revert fees
+      dispatch({
+        type: 'SET_DONATION_DATA',
+        payload: {
+          pledgeAmount: baseAmount.toFixed(2),
+          pledgeCurrency: 'USD',
+        },
+      })
     }
   }
 
@@ -114,6 +148,13 @@ export default function PaymentModalFiatOption() {
     if (selectedAmount !== null) {
       dispatch({
         type: 'SET_FORM_DATA',
+        payload: {
+          pledgeAmount: selectedAmount.toString(),
+          pledgeCurrency: 'USD',
+        },
+      })
+      dispatch({
+        type: 'SET_DONATION_DATA',
         payload: {
           pledgeAmount: selectedAmount.toString(),
           pledgeCurrency: 'USD',
