@@ -169,6 +169,19 @@ export default function PaymentModalFiatOption() {
   const isCustomAmount =
     !buttonValues.includes(Number(displayAmount)) && customAmount !== ''
 
+  useEffect(() => {
+    if (!displayAmount) return
+    if (!/^\d*\.?\d{0,2}$/.test(displayAmount)) return
+    dispatch({
+      type: 'SET_FORM_DATA',
+      payload: { pledgeAmount: displayAmount, pledgeCurrency: 'USD' },
+    })
+    dispatch({
+      type: 'SET_DONATION_DATA',
+      payload: { pledgeAmount: displayAmount, pledgeCurrency: 'USD' },
+    })
+  }, [displayAmount, dispatch])
+
   // **New useEffect to handle Donate button disabled state**
   useEffect(() => {
     const disableDonate =

@@ -401,13 +401,28 @@ const PaymentModalPersonalInfo: React.FC<
 
       if (response.ok) {
         if (selectedOption === 'fiat' && data?.pledgeId) {
+          const resolvedPledgeAmount =
+            formData.pledgeAmount ||
+            state.donationData.pledgeAmount ||
+            state.usdInput ||
+            state.selectedCurrencyPledged ||
+            ''
+          const resolvedPledgeCurrency = formData.pledgeCurrency || 'USD'
+
+          dispatch({
+            type: 'SET_FORM_DATA',
+            payload: {
+              pledgeAmount: resolvedPledgeAmount,
+              pledgeCurrency: resolvedPledgeCurrency,
+            },
+          })
           dispatch({
             type: 'SET_DONATION_DATA',
             payload: {
               ...state.donationData,
               pledgeId: data.pledgeId,
-              pledgeAmount: formData.pledgeAmount,
-              pledgeCurrency: formData.pledgeCurrency,
+              pledgeAmount: resolvedPledgeAmount,
+              pledgeCurrency: resolvedPledgeCurrency,
             },
           })
           dispatch({ type: 'SET_STEP', payload: 'fiatDonate' })
