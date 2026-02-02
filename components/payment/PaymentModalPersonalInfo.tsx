@@ -406,6 +406,8 @@ const PaymentModalPersonalInfo: React.FC<
             payload: {
               ...state.donationData,
               pledgeId: data.pledgeId,
+              pledgeAmount: formData.pledgeAmount,
+              pledgeCurrency: formData.pledgeCurrency,
             },
           })
           dispatch({ type: 'SET_STEP', payload: 'fiatDonate' })

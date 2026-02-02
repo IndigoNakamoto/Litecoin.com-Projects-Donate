@@ -145,7 +145,11 @@ function PaymentModalFiatDonate() {
     setIsLoading(true)
 
     const pledgeAmount =
-      state.formData.pledgeAmount || state.donationData.pledgeAmount || '0'
+      state.formData.pledgeAmount ||
+      state.donationData.pledgeAmount ||
+      state.usdInput ||
+      state.selectedCurrencyPledged ||
+      '0'
     const amountInDollars = parseFloat(pledgeAmount)
     const amountInCents = Math.round(amountInDollars * 100)
 
@@ -202,6 +206,8 @@ function PaymentModalFiatDonate() {
     parseFloat(
       state.formData.pledgeAmount ||
         state.donationData.pledgeAmount ||
+        state.usdInput ||
+        state.selectedCurrencyPledged ||
         '0'
     )
   )
