@@ -144,7 +144,9 @@ function PaymentModalFiatDonate() {
 
     setIsLoading(true)
 
-    const amountInDollars = parseFloat(state.formData.pledgeAmount || '0')
+    const pledgeAmount =
+      state.formData.pledgeAmount || state.donationData.pledgeAmount || '0'
+    const amountInDollars = parseFloat(pledgeAmount)
     const amountInCents = Math.round(amountInDollars * 100)
 
     if (isNaN(amountInCents) || amountInCents <= 0) {
@@ -196,7 +198,13 @@ function PaymentModalFiatDonate() {
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-  }).format(parseFloat(state.formData.pledgeAmount || '0'))
+  }).format(
+    parseFloat(
+      state.formData.pledgeAmount ||
+        state.donationData.pledgeAmount ||
+        '0'
+    )
+  )
 
   return (
     <div className="space-y- relative mx-auto flex w-full flex-col overflow-x-hidden p-4 ">

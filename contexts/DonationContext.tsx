@@ -62,6 +62,8 @@ type DonationData = {
   depositAddress?: string
   qrCode?: string
   donationUuid?: string
+  pledgeAmount?: string
+  pledgeCurrency?: string
 }
 
 type DonationState = {
