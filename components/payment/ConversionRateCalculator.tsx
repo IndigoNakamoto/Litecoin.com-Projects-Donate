@@ -26,14 +26,17 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
 }) => {
   const { state, dispatch } = useDonation()
   const { usdInput, cryptoInput, currencyList } = state
+  const safeUsdInput = typeof usdInput === 'string' ? usdInput : ''
+  const safeCryptoInput = typeof cryptoInput === 'string' ? cryptoInput : ''
 
   // Local State Variables
   const [cryptoRate, setCryptoRate] = useState<number | null>(null)
-  const [usdValue, setUsdValue] = useState<string>(usdInput || '100') // Calculated USD value
-  const [cryptoValue, setCryptoValue] = useState<string>(cryptoInput || '') // Calculated crypto value
+  const [usdValue, setUsdValue] = useState<string>(safeUsdInput || '100') // Calculated USD value
+  const [cryptoValue, setCryptoValue] = useState<string>(safeCryptoInput || '') // Calculated crypto value
   const [minDonation, setMinDonation] = useState<number>(0.001)
   const [isLoadingRate, setIsLoadingRate] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   // Utility functions to calculate values
   const calculateCryptoValue = useCallback((usd: number, rate: number) => {
@@ -60,8 +63,8 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
           setMinDonation(5 / rate) // Update crypto min donation based on rate
 
           // Update values based on existing inputs
-          if (usdInput) {
-            const numericUsd = parseFloat(usdInput)
+          if (safeUsdInput) {
+            const numericUsd = parseFloat(safeUsdInput)
             if (!isNaN(numericUsd)) {
               const newCryptoValue = calculateCryptoValue(numericUsd, rate)
               setCryptoValue(newCryptoValue)
@@ -81,15 +84,15 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
                 }
               )
             }
-          } else if (cryptoInput) {
-            const numericCrypto = parseFloat(cryptoInput)
+          } else if (safeCryptoInput) {
+            const numericCrypto = parseFloat(safeCryptoInput)
             if (!isNaN(numericCrypto)) {
               const newUsdValue = calculateUsdValue(numericCrypto, rate)
               setUsdValue(newUsdValue)
               dispatch({
                 type: 'SET_FORM_DATA',
                 payload: {
-                  pledgeAmount: cryptoInput,
+                  pledgeAmount: safeCryptoInput,
                   pledgeCurrency: selectedCurrencyCode || '',
                   assetName: selectedCurrencyName || '',
                 },
@@ -118,8 +121,8 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
 
   // Update cryptoValue when usdInput changes
   useEffect(() => {
-    if (usdInput && cryptoRate) {
-      const numericUsd = parseFloat(usdInput)
+    if (safeUsdInput && cryptoRate) {
+      const numericUsd = parseFloat(safeUsdInput)
       if (!isNaN(numericUsd)) {
         const newCryptoValue = calculateCryptoValue(numericUsd, cryptoRate)
         setCryptoValue(newCryptoValue)
@@ -134,11 +137,11 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
       } else {
         setCryptoValue('')
       }
-    } else if (usdInput === '') {
+    } else if (safeUsdInput === '') {
       setCryptoValue('')
     }
   }, [
-    usdInput,
+    safeUsdInput,
     cryptoRate,
     calculateCryptoValue,
     dispatch,
@@ -148,15 +151,15 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
 
   // Update usdValue when cryptoInput changes
   useEffect(() => {
-    if (cryptoInput && cryptoRate) {
-      const numericCrypto = parseFloat(cryptoInput)
+    if (safeCryptoInput && cryptoRate) {
+      const numericCrypto = parseFloat(safeCryptoInput)
       if (!isNaN(numericCrypto)) {
         const newUsdValue = calculateUsdValue(numericCrypto, cryptoRate)
         setUsdValue(newUsdValue)
         dispatch({
           type: 'SET_FORM_DATA',
           payload: {
-            pledgeAmount: cryptoInput,
+            pledgeAmount: safeCryptoInput,
             pledgeCurrency: selectedCurrencyCode || '',
             assetName: selectedCurrencyName || '',
           },
@@ -164,11 +167,11 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
       } else {
         setUsdValue('')
       }
-    } else if (cryptoInput === '') {
+    } else if (safeCryptoInput === '') {
       setUsdValue('')
     }
   }, [
-    cryptoInput,
+    safeCryptoInput,
     cryptoRate,
     calculateUsdValue,
     dispatch,
@@ -209,17 +212,21 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
 
   // Determine if cryptoInput is below minDonation
   const isBelowMin =
-    cryptoInput !== '' &&
-    !isNaN(parseFloat(cryptoInput)) &&
-    parseFloat(cryptoInput) < minDonation
+    safeCryptoInput !== '' &&
+    !isNaN(parseFloat(safeCryptoInput)) &&
+    parseFloat(safeCryptoInput) < minDonation
 
   // Determine if usdInput is below minimum donation
   const isUsdBelowMin =
-    usdInput !== '' && !isNaN(parseFloat(usdInput)) && parseFloat(usdInput) < 5
+    safeUsdInput !== '' && !isNaN(parseFloat(safeUsdInput)) && parseFloat(safeUsdInput) < 5
 
   // ----------------------------
   // NEW useEffect for toggling the donate button
   // ----------------------------
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
   useEffect(() => {
     // If either input is below min, disable the donate button
     if (isBelowMin || isUsdBelowMin) {
@@ -266,11 +273,11 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
               ? 'border-red-500 ring-1 ring-red-500'
               : 'bg-[#c6d3d6]'
           } rounded-r-3xl transition-colors duration-300`}
-          value={cryptoInput !== '' ? cryptoInput : cryptoValue}
+          value={safeCryptoInput !== '' ? safeCryptoInput : cryptoValue}
           onChange={(e) => handleCryptoChange(e.target.value)}
           min={minDonation}
           step={minDonation}
-          disabled={isLoadingRate}
+          disabled={isLoadingRate || !isHydrated}
         />
       </div>
 
@@ -301,9 +308,9 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
               ? 'border-red-500 ring-1 ring-red-500'
               : 'bg-[#c6d3d6]'
           } rounded-r-3xl transition-colors duration-300`}
-          value={usdInput !== '' ? usdInput : usdValue}
+          value={safeUsdInput !== '' ? safeUsdInput : usdValue}
           onChange={(e) => handleUsdChange(e.target.value)}
-          disabled={isLoadingRate}
+          disabled={isLoadingRate || !isHydrated}
         />
       </div>
 
