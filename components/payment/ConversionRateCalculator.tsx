@@ -36,7 +36,6 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
   const [minDonation, setMinDonation] = useState<number>(0.001)
   const [isLoadingRate, setIsLoadingRate] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [isHydrated, setIsHydrated] = useState(false)
 
   // Utility functions to calculate values
   const calculateCryptoValue = useCallback((usd: number, rate: number) => {
@@ -224,10 +223,6 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
   // NEW useEffect for toggling the donate button
   // ----------------------------
   useEffect(() => {
-    setIsHydrated(true)
-  }, [])
-
-  useEffect(() => {
     // If either input is below min, disable the donate button
     if (isBelowMin || isUsdBelowMin) {
       dispatch({ type: 'SET_DONATE_BUTTON_DISABLED', payload: true })
@@ -277,7 +272,7 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
           onChange={(e) => handleCryptoChange(e.target.value)}
           min={minDonation}
           step={minDonation}
-          disabled={isLoadingRate || !isHydrated}
+          disabled={false}
         />
       </div>
 
@@ -310,7 +305,7 @@ const ConversionRateCalculator: React.FC<ConversionRateCalculatorProps> = ({
           } rounded-r-3xl transition-colors duration-300`}
           value={safeUsdInput !== '' ? safeUsdInput : usdValue}
           onChange={(e) => handleUsdChange(e.target.value)}
-          disabled={isLoadingRate || !isHydrated}
+          disabled={false}
         />
       </div>
 

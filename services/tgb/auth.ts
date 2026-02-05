@@ -11,9 +11,23 @@ interface TokenRecord {
 }
 
 const TGB_API_BASE = 'https://public-api.tgbwidget.com/v1'
+const TOKEN_EARLY_REFRESH_MS = 60 * 1000
+const inMemoryToken: {
+  accessToken?: string
+  expiresAt?: Date
+} = {}
 
 export async function getAccessToken(): Promise<string> {
   try {
+    if (inMemoryToken.accessToken && inMemoryToken.expiresAt) {
+      const refreshThreshold = new Date(
+        inMemoryToken.expiresAt.getTime() - TOKEN_EARLY_REFRESH_MS
+      )
+      if (isBefore(new Date(), refreshThreshold)) {
+        return inMemoryToken.accessToken
+      }
+    }
+
     // Fetch the latest token from the database
     const token = await prisma?.token.findFirst({
       orderBy: { refreshedAt: 'desc' },
@@ -24,6 +38,8 @@ export async function getAccessToken(): Promise<string> {
 
       if (isBefore(now, token.expiresAt)) {
         // Access token is still valid
+        inMemoryToken.accessToken = token.accessToken
+        inMemoryToken.expiresAt = token.expiresAt
         return token.accessToken
       } else {
         // Access token has expired, attempt to refresh
@@ -108,6 +124,8 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
       }
     }
 
+    inMemoryToken.accessToken = newAccessToken
+    inMemoryToken.expiresAt = expiresAt
     return newAccessToken
   } catch (error: any) {
     console.error(
@@ -180,6 +198,8 @@ async function loginAndSaveTokens(): Promise<string> {
       }
     }
 
+    inMemoryToken.accessToken = accessToken
+    inMemoryToken.expiresAt = expiresAt
     return accessToken
   } catch (error: any) {
     // Enhanced error logging
