@@ -183,9 +183,9 @@ export async function GET(request: NextRequest) {
 **API Routes**:
 - Legacy-parity endpoints maintained for frontend compatibility
 - New TGB proxy endpoints (`/api/tgb/donations/*`)
-- Missing routes documented in [MIGRATION_READINESS.md](../MIGRATION_READINESS.md)
+- Missing routes documented in [MIGRATION_READINESS.md](../docs/migration/MIGRATION_READINESS.md)
 
-**Missing Features** (from MIGRATION_READINESS.md):
+**Missing Features** (from [MIGRATION_READINESS.md](../docs/migration/MIGRATION_READINESS.md)):
 - Cron jobs configuration (`vercel.json`)
 - Cron API routes (`/api/cron/daily`, `/api/cron/monthly`, `/api/clearKV`)
 - Webhook handler (`/api/webhook/tgb`)
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
 
 - [README.md](README.md) - Project documentation
 - [STYLE_GUIDE.md](STYLE_GUIDE.md) - Navigation component style guide
-- [MIGRATION_READINESS.md](../MIGRATION_READINESS.md) - Migration status and checklist
+- [MIGRATION_READINESS.md](../docs/migration/MIGRATION_READINESS.md) - Migration status and checklist
 - `prisma/schema.prisma` - Database schema
 - `services/tgb/client.ts` - TGB API client
 - `contexts/DonationContext.tsx` - Donation state management
@@ -262,7 +262,7 @@ const donations = await prisma.donationPledge.findMany({
 
 ## Notes
 
-- Always check [MIGRATION_READINESS.md](../MIGRATION_READINESS.md) before making breaking changes
+- Always check [MIGRATION_READINESS.md](../docs/migration/MIGRATION_READINESS.md) before making breaking changes
 - Update rules immediately when patterns change or AI fails at a task
 - Keep rules minimal and high-quality - they're included in every conversation
 - For migration workflows, see `.cursor/skills/` directory

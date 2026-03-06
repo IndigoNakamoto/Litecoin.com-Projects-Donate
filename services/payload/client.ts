@@ -4,17 +4,23 @@ function stripTrailingSlashes(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
+// Read at runtime (bracket notation avoids any build-time inlining of env)
+function getEnv(key: string): string | undefined {
+  return process.env[key]
+}
+
 function resolvePayloadApiUrl(): string {
-  // Check if Payload CMS is enabled first - if so, ensure we use port 3011
-  const usePayload = process.env.USE_PAYLOAD_CMS?.trim().toLowerCase()
+  const usePayload = getEnv('USE_PAYLOAD_CMS')?.trim().toLowerCase()
   const isPayloadEnabled = usePayload === 'true' || usePayload === '1' || usePayload === 'yes' || usePayload === 'on'
-  
-  // Explicit API URL always wins, BUT if it points to port 3000 and Payload is enabled, override it
-  const explicitUrl = process.env.PAYLOAD_API_URL
+
+  // Explicit API URL always wins
+  const explicitUrl = getEnv('PAYLOAD_API_URL')
   if (explicitUrl) {
-    // If Payload CMS is enabled but URL points to Next.js (3000), use Payload CMS (3011) instead
-    if (isPayloadEnabled && explicitUrl.includes(':3000')) {
-      if (process.env.NODE_ENV === 'development') {
+    // On host: Next.js is 3000, Payload is 3011 — override so we hit Payload. In Docker, URL is e.g.
+    // http://litecoin-fund-cms:3000/api (different host); never replace port for non-localhost.
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(explicitUrl)
+    if (isPayloadEnabled && isLocalhost && explicitUrl.includes(':3000')) {
+      if (getEnv('NODE_ENV') === 'development') {
         console.warn(`[resolvePayloadApiUrl] PAYLOAD_API_URL points to port 3000 but USE_PAYLOAD_CMS is enabled. Using port 3011 instead.`)
       }
       return explicitUrl.replace(':3000', ':3011')
@@ -23,7 +29,7 @@ function resolvePayloadApiUrl(): string {
   }
 
   // Allow setting a base server URL and deriving the REST prefix
-  const cmsUrl = process.env.PAYLOAD_CMS_URL
+  const cmsUrl = getEnv('PAYLOAD_CMS_URL')
   if (cmsUrl) {
     const base = stripTrailingSlashes(cmsUrl)
     return `${base}/api`
@@ -46,7 +52,8 @@ function getPayloadApiUrl(): string {
 
 export function resolvePayloadServerUrl(): string {
   const PAYLOAD_API_URL = getPayloadApiUrl()
-  if (process.env.PAYLOAD_CMS_URL) return stripTrailingSlashes(process.env.PAYLOAD_CMS_URL)
+  const cmsUrl = getEnv('PAYLOAD_CMS_URL')
+  if (cmsUrl) return stripTrailingSlashes(cmsUrl)
   // Derive from API URL (strip /api suffix if present)
   if (PAYLOAD_API_URL.endsWith('/api')) return PAYLOAD_API_URL.slice(0, -'/api'.length)
   return PAYLOAD_API_URL
@@ -65,7 +72,7 @@ export function resolvePayloadAssetUrl(url?: string): string | undefined {
  * Create a Payload CMS API client
  */
 export function createPayloadClient(): AxiosInstance {
-  const apiToken = process.env.PAYLOAD_API_TOKEN
+  const apiToken = getEnv('PAYLOAD_API_TOKEN')
   // Always resolve URL at runtime to ensure fresh env vars
   const apiUrl = resolvePayloadApiUrl()
 

@@ -42,15 +42,16 @@ export async function GET(request: NextRequest) {
   try {
     payloadOrigin = new URL(payloadUrl).origin
   } catch {
-    // If PAYLOAD_CMS_URL is misconfigured, fall back to a safe default
     payloadOrigin = 'http://localhost:3011'
   }
 
+  // Allow Payload origin (includes Docker internal hostname e.g. http://litecoin-fund-cms:3000)
   const allowedOrigins = new Set<string>([
     payloadOrigin,
     'http://localhost:3011',
     'http://127.0.0.1:3011',
     'https://projectscms.lite.space',
+    'http://litecoin-fund-cms:3000',
   ])
 
   if (!allowedOrigins.has(parsed.origin)) {

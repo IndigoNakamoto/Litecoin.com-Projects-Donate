@@ -55,14 +55,15 @@ export const optimizeWebflowImageUrl = (
 
 export const customImageLoader = ({ src, width, quality }: { src: string; width: number; quality?: number }) => {
   // Proxy Payload CMS images through Next.js API to avoid CORS and blocking issues
-  // This works for both localhost and production Payload CMS URLs
+  // This works for localhost, production, and Docker internal hostname (litecoin-fund-cms)
   const payloadCmsUrl = process.env.NEXT_PUBLIC_PAYLOAD_CMS_URL || process.env.PAYLOAD_CMS_URL || 'http://localhost:3011'
-  const isPayloadImage = 
-    src.includes('localhost:3011') || 
+  const isPayloadImage =
+    src.includes('localhost:3011') ||
     src.includes('127.0.0.1:3011') ||
     src.includes('projectscms.lite.space') ||
+    src.includes('litecoin-fund-cms') || // Docker internal hostname – browser can't resolve; proxy fetches server-side
     src.startsWith('/api/media/') // Relative Payload CMS URLs
-  
+
   if (isPayloadImage) {
     // Use Next.js proxy route for Payload CMS images
     // Handle both absolute and relative URLs
