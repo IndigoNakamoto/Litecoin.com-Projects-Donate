@@ -49,6 +49,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
       onRequestClose={onRequestClose}
       shouldCloseOnOverlayClick={shouldCloseOnOverlayClick}
       shouldCloseOnEsc={shouldCloseOnEsc}
+      ariaHideApp={false}
       className={className || defaultClassName}
       overlayClassName={overlayClassName || defaultOverlayClassName}
       contentLabel={title || 'Modal'}

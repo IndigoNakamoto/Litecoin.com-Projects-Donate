@@ -284,6 +284,34 @@ const PaymentModalPersonalInfo: React.FC<
       return
     }
 
+    const { selectedOption } = state
+
+    // Resolve pledge amount from all possible sources (fiat/crypto flow can store it in different places)
+    const resolvedPledgeAmount =
+      formData.pledgeAmount ||
+      state.donationData.pledgeAmount ||
+      state.usdInput ||
+      state.selectedCurrencyPledged ||
+      ''
+
+    if (selectedOption === 'fiat') {
+      const amount = parseFloat(String(resolvedPledgeAmount).replace(/,/g, ''))
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setErrors((prev) => ({ ...prev, receiptEmail: 'Please go back and enter a donation amount.' }))
+        setIsLoading(false)
+        return
+      }
+    }
+
+    if (selectedOption === 'crypto') {
+      const amount = parseFloat(String(resolvedPledgeAmount).replace(/,/g, ''))
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setErrors((prev) => ({ ...prev, receiptEmail: 'Please go back and enter a donation amount.' }))
+        setIsLoading(false)
+        return
+      }
+    }
+
     dispatch({
       type: 'SET_DONATION_DATA',
       payload: {
@@ -291,8 +319,6 @@ const PaymentModalPersonalInfo: React.FC<
         ...formData,
       },
     })
-
-    const { selectedOption } = state
 
     let apiEndpoint = ''
     let apiBody = {}
@@ -315,9 +341,9 @@ const PaymentModalPersonalInfo: React.FC<
         projectSlug: projectSlug,
         organizationId: 1189134331,
         isAnonymous: donateAnonymously,
-        pledgeCurrency: formData.pledgeCurrency,
+        pledgeCurrency: formData.pledgeCurrency || 'USD',
         assetDescription: formData.assetName,
-        pledgeAmount: formData.pledgeAmount,
+        pledgeAmount: resolvedPledgeAmount,
         firstName: donateAnonymously ? anonInfo.firstName : formData.firstName,
         lastName: donateAnonymously ? anonInfo.lastName : formData.lastName,
         receiptEmail: donateAnonymously
@@ -340,7 +366,7 @@ const PaymentModalPersonalInfo: React.FC<
         projectSlug: projectSlug,
         organizationId: 1189134331,
         pledgeCurrency: formData.assetSymbol,
-        pledgeAmount: formData.pledgeAmount,
+        pledgeAmount: resolvedPledgeAmount,
         receiptEmail: donateAnonymously
           ? anonInfo.receiptEmail
           : formData.receiptEmail,

@@ -63,13 +63,9 @@ const ThankYouModal: React.FC<ModalProps> = ({
       isOpen={isOpen}
       style={{ content: focusStyle }}
       onRequestClose={onRequestClose}
+      ariaHideApp={false}
       className="max-h-full max-w-sm overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl  sm:m-8 md:max-w-xl"
       overlayClassName="inset-0 fixed backdrop-blur-xl  flex items-center justify-center transform duration-400 ease-in"
-      appElement={
-        typeof window === 'undefined'
-          ? undefined
-          : document?.getElementById('root') || undefined
-      }
     >
       <div className="relative -mb-12 flex justify-end">
         <FontAwesomeIcon

@@ -65,9 +65,9 @@ const PaymentModal: React.FC<ModalProps> = ({
       onRequestClose={handleClose}
       shouldCloseOnOverlayClick={true}
       shouldCloseOnEsc={true}
+      ariaHideApp={false}
       className="h-full max-h-[98vh] min-h-[50vh] max-w-[44rem] overflow-y-auto overflow-x-hidden border border-black bg-[#f0f0f0] p-8 shadow-xl sm:m-8 sm:h-min sm:w-full md:p-16"
       overlayClassName="fixed inset-0 bg-black/70 z-[40] flex items-center justify-center transform duration-400 ease-in"
-      // Remove appElement if set globally
     >
       <div className="relative flex justify-end text-[#f46748]">
         <FontAwesomeIcon
