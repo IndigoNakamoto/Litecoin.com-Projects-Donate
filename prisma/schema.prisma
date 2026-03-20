@@ -218,3 +218,22 @@ model Token {
 
   @@map("tokens")
 }
+
+/// Crowdfunding project applications from /projects/submit (stored locally; admin review / voting later)
+model ProjectApplication {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// pending | approved | rejected — for future council workflow
+  status String @default("pending")
+
+  projectName      String @map("project_name")
+  applicantEmail   String @map("applicant_email")
+  /// Full form payload (overview, budget, applicant) as submitted
+  payload Json
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("project_applications")
+}

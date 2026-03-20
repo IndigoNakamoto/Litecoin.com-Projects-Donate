@@ -2,9 +2,9 @@ import { Metadata } from 'next'
 import SubmittedSection from '@/components/ui/SubmittedSection'
 
 export const metadata: Metadata = {
-  title: 'Litecoin.net | Project Submitted',
+  title: 'Litecoin.com | Project Submitted',
   description:
-    'Thank you for submitting your project to Litecoin.net. We will review your application shortly.',
+    'Thank you for submitting your project to Litecoin.com. We will review your application shortly.',
 }
 
 export default function SubmittedPage() {

@@ -12,7 +12,6 @@
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.1",
-    "@octokit/rest": "^22.0.1",
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.1.0",
     "@types/pg": "^8.15.6",
@@ -40,9 +39,9 @@
     "@svgr/webpack": "^8.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pdfkit": "^0.14.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/pdfkit": "^0.14.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "tailwindcss": "^4",

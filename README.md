@@ -87,7 +87,8 @@ These correspond to the public site routes:
 - **`/projects/[slug]`** → **`litecoin.com/projects/:slug`** (project detail + donation modal)
 - **`/donate`** → **`litecoin.com/donate`** (donation page)
 - `/projects/submit` (project submission form)
-- `/projects/submitted` (submission confirmation)
+- `/projects/submitted` (generic confirmation)
+- `/projects/submitted/[id]` (council review of one application—Discord link; not for applicants; URL is not secret—see env section)
 
 ## Environment Variables
 
@@ -101,6 +102,12 @@ This app expects env vars compatible with the **existing (legacy) production DB*
 - **The Giving Block**
   - **`GIVING_BLOCK_LOGIN`**
   - **`GIVING_BLOCK_PASSWORD`**
+
+- **Project submission** (`/projects/submit` → `POST /api/project-applications`)
+  - Submissions are stored in PostgreSQL (`project_applications` via Prisma). Apply DDL once: `litecoin-fund/prisma/project_applications.sql` or from `litecoin-fund`: `npx prisma db push`.
+  - **`NEXT_PUBLIC_SITE_URL`** or **`APP_PUBLIC_URL`**: Canonical site origin (no trailing slash), e.g. `https://projects.lite.space`. Used for absolute links in Discord (and falls back to `x-forwarded-*` / `Host` when unset).
+  - **`DISCORD_WEBHOOK_URL`**: Optional incoming webhook with a council link to `/projects/submitted/{id}` plus a short summary (submission still succeeds if unset). Applicants only see the generic `/projects/submitted` thank-you page.
+  - Anyone with the submission URL can view that application’s details (obscure id, not authenticated). Tighten with auth when the formal council workflow ships.
 
 - **Schema expectations (legacy parity)**
   - Token caching uses the legacy **`tokens`** table with columns:

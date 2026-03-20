@@ -3,9 +3,9 @@ import ProjectSubmissionForm from '@/components/projects/ProjectSubmissionForm'
 import ApplySection from '@/components/ui/ApplySection'
 
 export const metadata: Metadata = {
-  title: 'Litecoin.net | Submit Your Project',
+  title: 'Litecoin.com | Submit Your Project',
   description:
-    'Submit your project to Litecoin.net for community crowdfunding and support. Join the Litecoin ecosystem and get your project listed today.',
+    'Submit your project to Litecoin.com for community crowdfunding and support. Join the Litecoin ecosystem and get your project listed today.',
 }
 
 export default function SubmitPage() {
@@ -15,7 +15,7 @@ export default function SubmitPage() {
         <p>
           Have a project that can benefit the Litecoin community? Use the form
           below to submit your project for consideration. Once approved, your
-          project will be listed on Litecoin.net, where the community can help
+          project will be listed on Litecoin.com, where the community can help
           crowdfund and support your initiative.
         </p>
         <p>
