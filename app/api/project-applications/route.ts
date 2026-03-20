@@ -2,7 +2,6 @@ import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 import { prisma } from '@/lib/prisma'
-import { buildProjectApplicationDiscordContent } from '@/lib/project-application-format'
 import { getPublicSiteOrigin, submissionDetailPath } from '@/lib/public-site-url'
 
 function normalizeSecret(value: string | undefined): string | undefined {
@@ -71,11 +70,7 @@ export async function POST(request: NextRequest) {
       try {
         const origin = getPublicSiteOrigin(request)
         const submissionUrl = `${origin}${submissionDetailPath(application.id)}`
-        const content = buildProjectApplicationDiscordContent({
-          submissionUrl,
-          projectName: application.projectName,
-          payload: application.payload as Prisma.InputJsonValue,
-        })
+        const content = `New Project Application - ${application.projectName} ${submissionUrl}`
         await axios.post(webhook, { content })
       } catch (err) {
         console.error('[api/project-applications] Discord webhook failed:', err)

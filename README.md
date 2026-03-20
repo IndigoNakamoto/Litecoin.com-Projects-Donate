@@ -106,7 +106,7 @@ This app expects env vars compatible with the **existing (legacy) production DB*
 - **Project submission** (`/projects/submit` → `POST /api/project-applications`)
   - Submissions are stored in PostgreSQL (`project_applications` via Prisma). Apply DDL once: `litecoin-fund/prisma/project_applications.sql` or from `litecoin-fund`: `npx prisma db push`.
   - **`NEXT_PUBLIC_SITE_URL`** or **`APP_PUBLIC_URL`**: Canonical site origin (no trailing slash), e.g. `https://projects.lite.space`. Used for absolute links in Discord (and falls back to `x-forwarded-*` / `Host` when unset).
-  - **`DISCORD_WEBHOOK_URL`**: Optional incoming webhook with a council link to `/projects/submitted/{id}` plus a short summary (submission still succeeds if unset). Applicants only see the generic `/projects/submitted` thank-you page.
+  - **`DISCORD_WEBHOOK_URL`**: Optional incoming webhook: one line `New Project Application - {name} {url}` (submission still succeeds if unset). Applicants only see the generic `/projects/submitted` thank-you page.
   - Anyone with the submission URL can view that application’s details (obscure id, not authenticated). Tighten with auth when the formal council workflow ships.
 
 - **Schema expectations (legacy parity)**
