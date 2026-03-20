@@ -80,31 +80,35 @@ function decryptPayload(encryptedHex: string): DecryptedPayload {
 }
 
 /**
- * Helper function to fetch donation by pledgeId or donationUuid via API
+ * Helper function to fetch donation(s) by pledgeId or donationUuid via API.
+ * Returns { donation, donations } where donations is all rows for a pledgeId.
  */
-async function fetchDonationByPledgeOrUuid(pledgeId?: string, donationUuid?: string): Promise<any> {
+async function fetchDonationsByPledgeOrUuid(
+  pledgeId?: string,
+  donationUuid?: string
+): Promise<{ donation: any; donations: any[] } | null> {
   const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
-  
+
   if (pledgeId) {
     const response = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, {
       signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
-      return data.donation
+      return { donation: data.donation, donations: data.donations || [data.donation] }
     }
   }
-  
+
   if (donationUuid) {
     const response = await fetch(`${apiUrl}/api/donations/by-donation-uuid/${encodeURIComponent(donationUuid)}`, {
       signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
-      return data.donation
+      return { donation: data.donation, donations: [data.donation] }
     }
   }
-  
+
   return null
 }
 
@@ -124,7 +128,9 @@ async function checkWebhookEventExists(eid: string): Promise<boolean> {
 }
 
 /**
- * Handler for DEPOSIT_TRANSACTION event
+ * Handler for DEPOSIT_TRANSACTION event.
+ * Supports multiple deposits to the same pledge address: if the existing
+ * donation row already has an eid, creates a new row via POST then patches it.
  */
 async function handleDepositTransaction(
   eventType: WebhookEventType,
@@ -136,32 +142,73 @@ async function handleDepositTransaction(
     throw new Error('Missing pledgeId/donationUuid or eid in payload')
   }
 
-  // Check if the event has already been processed (idempotency)
   const existingEvent = await checkWebhookEventExists(eid)
-
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
     return
   }
 
-  // Find the associated Donation
-  const donation = await fetchDonationByPledgeOrUuid(pledgeId, donationUuid)
+  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const result = await fetchDonationsByPledgeOrUuid(pledgeId, donationUuid)
 
-  if (!donation) {
+  if (!result) {
     throw new Error(
       `Donation with pledgeId ${pledgeId} or donationUuid ${donationUuid} not found`
     )
   }
 
-  // Prepare update data
+  let donation: any
+  const { donations } = result
+
+  // Find an unfilled row (no eid yet) to update
+  const unfilled = donations.find((d: any) => !d.eid)
+  if (unfilled) {
+    donation = unfilled
+  } else {
+    // All rows already have a deposit — create a new row cloning donor/project info
+    const original = donations[0]
+    const createResponse = await fetch(`${apiUrl}/api/donations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectSlug: original.project_slug,
+        organizationId: original.organization_id,
+        donationType: original.donation_type,
+        pledgeAmount: payload.amount?.toString() || '0',
+        assetSymbol: original.asset_symbol,
+        assetDescription: original.asset_description,
+        firstName: original.first_name,
+        lastName: original.last_name,
+        donorEmail: original.donor_email,
+        isAnonymous: original.is_anonymous,
+        taxReceipt: original.tax_receipt,
+        joinMailingList: original.join_mailing_list,
+        socialX: original.social_x,
+        socialFacebook: original.social_facebook,
+        socialLinkedIn: original.social_linkedin,
+        pledgeId: original.pledge_id,
+        depositAddress: original.deposit_address,
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text()
+      throw new Error(`Failed to create donation for additional deposit: ${createResponse.status} ${errorText}`)
+    }
+
+    const created = await createResponse.json()
+    donation = created.donation
+    console.log(`[TGB Webhook] Created new donation id=${donation.id} for additional deposit to pledgeId=${pledgeId}`)
+  }
+
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}
-  
-  // Update the Donation record via API
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+
   const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      success: true,
       transactionHash: payload.transactionHash || null,
       payoutAmount: payload.payoutAmount,
       payoutCurrency: payload.payoutCurrency,
@@ -187,7 +234,6 @@ async function handleDepositTransaction(
     throw new Error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
   }
 
-  // Upsert WebhookEvent record via API
   const webhookResponse = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -203,14 +249,15 @@ async function handleDepositTransaction(
   if (!webhookResponse.ok) {
     const errorText = await webhookResponse.text()
     console.error(`Failed to create/update webhook event: ${webhookResponse.status} ${errorText}`)
-    // Don't throw - donation update succeeded
   }
 
-  console.log(`[TGB Webhook] Processed DEPOSIT_TRANSACTION: eid=${eid}, pledgeId=${pledgeId}, donationUuid=${donationUuid}`)
+  console.log(`[TGB Webhook] Processed DEPOSIT_TRANSACTION: eid=${eid}, pledgeId=${pledgeId}, donationId=${donation.id}`)
 }
 
 /**
- * Handler for TRANSACTION_CONVERTED event
+ * Handler for TRANSACTION_CONVERTED event.
+ * Matches the correct donation row by transactionHash when multiple
+ * deposits exist for the same pledgeId, then patches by numeric id.
  */
 async function handleTransactionConverted(
   eventType: WebhookEventType,
@@ -222,30 +269,45 @@ async function handleTransactionConverted(
     throw new Error('Missing pledgeId or eid in payload')
   }
 
-  // Check if the event has already been processed (idempotency)
   const existingEvent = await checkWebhookEventExists(eid)
-
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
     return
   }
 
-  // Find the associated Donation
-  const donation = await fetchDonationByPledgeOrUuid(pledgeId)
+  const result = await fetchDonationsByPledgeOrUuid(pledgeId)
+  if (!result) {
+    throw new Error(`Donation with pledgeId ${pledgeId} not found`)
+  }
+
+  // Match by transactionHash to find the correct deposit row
+  let donation: any = null
+  const { donations } = result
+
+  if (payload.transactionHash && donations.length > 1) {
+    donation = donations.find(
+      (d: any) => d.transaction_hash === payload.transactionHash
+    )
+  }
+
+  // Fallback to first row (backward compat for single-deposit pledges)
+  if (!donation) {
+    donation = result.donation
+  }
 
   if (!donation) {
     throw new Error(`Donation with pledgeId ${pledgeId} not found`)
   }
 
-  // Prepare update data
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}
 
-  // Update the Donation record via API
+  // PATCH by numeric id so only the correct row is updated
   const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
-  const updateResponse = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, {
+  const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      success: true,
       convertedAt: new Date(Number(payload.convertedAt)).toISOString(),
       netValueAmount: payload.netValueAmount,
       grossAmount: payload.grossAmount,
@@ -273,7 +335,6 @@ async function handleTransactionConverted(
     throw new Error(`Failed to update donation: ${updateResponse.status} ${errorText}`)
   }
 
-  // Create WebhookEvent record via API
   const webhookResponse = await fetch(`${apiUrl}/api/webhook-events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -290,10 +351,9 @@ async function handleTransactionConverted(
   if (!webhookResponse.ok) {
     const errorText = await webhookResponse.text()
     console.error(`Failed to create webhook event: ${webhookResponse.status} ${errorText}`)
-    // Don't throw - donation update succeeded
   }
 
-  console.log(`[TGB Webhook] Processed TRANSACTION_CONVERTED: eid=${eid}, pledgeId=${pledgeId}`)
+  console.log(`[TGB Webhook] Processed TRANSACTION_CONVERTED: eid=${eid}, pledgeId=${pledgeId}, donationId=${donation.id}`)
 }
 
 /**
@@ -321,12 +381,14 @@ async function handleUnknownEvent(
   }
 
   // Find the associated Donation
-  const donation = await fetchDonationByPledgeOrUuid(pledgeId, donationUuid)
+  const result = await fetchDonationsByPledgeOrUuid(pledgeId, donationUuid)
 
-  if (!donation) {
+  if (!result) {
     console.warn(`[TGB Webhook] Donation not found for unknown event: pledgeId=${pledgeId}, donationUuid=${donationUuid}`)
     return
   }
+
+  const donation = result.donation
 
   // Update the Donation's eventData with the unknown event
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}

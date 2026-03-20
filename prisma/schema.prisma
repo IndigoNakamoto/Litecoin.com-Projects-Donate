@@ -55,7 +55,7 @@ model Donation {
 
   // TGB 200 Response Values
   donationUuid   String? @unique @map("donation_uuid") // stock
-  pledgeId       String? @unique @map("pledge_id") // crypto / fiat
+  pledgeId       String? @map("pledge_id") // crypto / fiat (not unique: multiple deposits per pledge)
   depositAddress String? @map("deposit_address") // crypto
 
   // Success Status
@@ -86,6 +86,7 @@ model Donation {
   // Relations
   webhookEvents WebhookEvent[] @relation("DonationWebhookEvents")
 
+  @@index([pledgeId])
   @@map("donations")
 }
 
