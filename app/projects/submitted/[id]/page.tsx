@@ -19,12 +19,12 @@ export async function generateMetadata({
   })
   if (!row) {
     return {
-      title: 'Litecoin.com | Application not found',
+      title: 'Litecoin | Application not found',
       robots: { index: false, follow: false },
     }
   }
   return {
-    title: `Litecoin.com | Council review — ${row.projectName}`,
+    title: `Litecoin | Council review — ${row.projectName}`,
     description: 'Open Source Fund council review of a project application.',
     robots: { index: false, follow: false },
   }

@@ -3,7 +3,7 @@ import ProjectSubmissionForm from '@/components/projects/ProjectSubmissionForm'
 import ApplySection from '@/components/ui/ApplySection'
 
 export const metadata: Metadata = {
-  title: 'Litecoin.com | Submit Your Project',
+  title: 'Litecoin | Submit Your Project',
   description:
     'Submit your project to Litecoin.com for community crowdfunding and support. Join the Litecoin ecosystem and get your project listed today.',
 }
