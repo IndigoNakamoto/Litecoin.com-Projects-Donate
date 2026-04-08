@@ -10,8 +10,18 @@ const mockKv = {
 let kv: typeof mockKv
 
 try {
-  // Check if KV credentials are available
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Local Docker / self-hosted: .env often contains production KV keys; that serves stale
+  // cached stats from Vercel instead of your container Postgres. Set DISABLE_VERCEL_KV=1
+  // in compose (or omit KV_* vars) to use the in-memory no-op client.
+  const vercelKvDisabled =
+    process.env.DISABLE_VERCEL_KV === '1' ||
+    process.env.DISABLE_VERCEL_KV === 'true'
+
+  if (
+    !vercelKvDisabled &&
+    process.env.KV_REST_API_URL &&
+    process.env.KV_REST_API_TOKEN
+  ) {
     // Dynamically import only if credentials are present
     const vercelKvModule = require('@vercel/kv')
     kv = vercelKvModule.kv

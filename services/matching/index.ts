@@ -59,14 +59,9 @@ export async function getActiveMatchingDonorsFromPayload(): Promise<PayloadMatch
       }
     )
     
-    const now = new Date()
-    
-    // Filter by date range
-    return donors.filter((donor) => {
-      const startDate = new Date(donor.startDate)
-      const endDate = new Date(donor.endDate)
-      return now >= startDate && now <= endDate
-    })
+    // Eligibility for a specific donation is checked per donation date vs donor start/end
+    // (see processDonationMatchingWithPayload). Do not filter by "today" here.
+    return donors
   } catch (error) {
     console.error('Error fetching matching donors from Payload CMS:', error)
     throw error
@@ -74,25 +69,26 @@ export async function getActiveMatchingDonorsFromPayload(): Promise<PayloadMatch
 }
 
 /**
- * Get already matched amounts for multiple donors
- * Returns a Map of donorId -> total matched amount
+ * Matched amounts per donor grouped by calendar year.
+ * `totalMatchingAmount` is an annual cap that resets each January 1.
+ * Returns a map keyed by `${donorId}:${year}`.
  */
-export async function getDonorsMatchedAmounts(donorIds: string[]): Promise<Map<string, number>> {
-  const matchedAmounts = await prisma.matchingDonationLog.groupBy({
-    by: ['donorId'],
-    where: {
-      donorId: { in: donorIds },
-    },
-    _sum: {
-      matchedAmount: true,
-    },
-  })
+export async function getDonorsMatchedAmountsByYear(donorIds: string[]): Promise<Map<string, number>> {
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ donorId: string; year: number; total: unknown }>
+  >(
+    `SELECT "donorId", EXTRACT(YEAR FROM date)::int AS year, SUM("matchedAmount")::float AS total
+     FROM "MatchingDonationLog"
+     WHERE "donorId" = ANY($1)
+     GROUP BY "donorId", EXTRACT(YEAR FROM date)`,
+    donorIds
+  )
 
   const donorMatchedAmountMap = new Map<string, number>()
-  matchedAmounts.forEach((item) => {
-    const matchedAmount = item._sum.matchedAmount?.toNumber() || 0
-    donorMatchedAmountMap.set(item.donorId, matchedAmount)
-  })
+  for (const row of rows) {
+    const total = typeof row.total === 'number' ? row.total : Number(row.total) || 0
+    donorMatchedAmountMap.set(`${row.donorId}:${row.year}`, total)
+  }
 
   return donorMatchedAmountMap
 }
@@ -116,8 +112,93 @@ function getSupportedProjectSlugs(donor: PayloadMatchingDonor): string[] {
     .filter((slug): slug is string => slug !== null)
 }
 
+interface ProjectTarget {
+  target: number
+  payloadId: number
+}
+
+/**
+ * Fetch projects with donationTarget set from Payload CMS.
+ */
+async function getProjectTargets(): Promise<Map<string, ProjectTarget>> {
+  const client = createPayloadClient()
+  const projects = await fetchAllPages<PayloadProject>(client, '/projects', { depth: 0 })
+  const targetMap = new Map<string, ProjectTarget>()
+  for (const project of projects) {
+    if (project.donationTarget != null && project.donationTarget > 0) {
+      targetMap.set(project.slug.trim().toLowerCase(), {
+        target: project.donationTarget,
+        payloadId: project.id,
+      })
+    }
+  }
+  return targetMap
+}
+
+/**
+ * Pre-compute community donation totals per project.
+ */
+async function getCommunityTotalsByProject(): Promise<Map<string, number>> {
+  const eligible = `(
+    status IN ('Complete', 'Advanced', 'COMPLETED')
+    OR (success IS TRUE AND (status IS NULL OR TRIM(COALESCE(status, '')) = ''))
+  )`
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ slug: string; total: number }>
+  >(
+    `SELECT LOWER(TRIM(project_slug)) AS slug, SUM(value_at_donation_time_usd)::float AS total
+     FROM donations
+     WHERE ${eligible}
+       AND value_at_donation_time_usd IS NOT NULL
+       AND value_at_donation_time_usd > 0
+     GROUP BY LOWER(TRIM(project_slug))`
+  )
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    map.set(row.slug, row.total)
+  }
+  return map
+}
+
+/**
+ * Pre-compute matched donation totals per project.
+ */
+async function getMatchedTotalsByProject(): Promise<Map<string, number>> {
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{ slug: string; total: number }>
+  >(
+    `SELECT LOWER(TRIM("projectSlug")) AS slug, SUM("matchedAmount")::float AS total
+     FROM "MatchingDonationLog"
+     GROUP BY LOWER(TRIM("projectSlug"))`
+  )
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    map.set(row.slug, row.total)
+  }
+  return map
+}
+
+/**
+ * Update project status to 'funded' (Funding Target Reached) in Payload CMS.
+ */
+async function markProjectFunded(payloadId: number, slug: string): Promise<void> {
+  const client = createPayloadClient()
+  try {
+    await client.patch(`/projects/${payloadId}`, { status: 'funded' })
+    console.log(`Project "${slug}" funding target reached (Payload ID ${payloadId})`)
+  } catch (error) {
+    console.warn(`Failed to update project "${slug}" status in Payload (may need write-access token):`, error)
+  }
+}
+
 /**
  * Main matching process using Payload CMS
+ *
+ * Business rules:
+ * - `totalMatchingAmount` is an annual cap that resets each calendar year.
+ * - FCFS by donation `createdAt` within each year's pool.
+ * - Donations from a prior year that missed matching do NOT carry over.
+ * - Per-project `donationTarget` caps total funding (community + matched).
  */
 export async function processDonationMatchingWithPayload(options?: {
   dryRun?: boolean
@@ -129,9 +210,17 @@ export async function processDonationMatchingWithPayload(options?: {
   console.log('Starting processDonationMatching with Payload CMS')
   console.log(`  Dry run: ${dryRun}`)
   
-  // Build where clause for donations query
+  // Complete donations only (status is source of truth; success=true only if status empty — legacy)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const whereClause: any = { processed: false }
+  const whereClause: any = {
+    processed: false,
+    OR: [
+      { status: { in: ['Complete', 'Advanced', 'COMPLETED'] } },
+      {
+        AND: [{ success: true }, { OR: [{ status: null }, { status: '' }] }],
+      },
+    ],
+  }
   if (minDate) {
     whereClause.createdAt = { gte: minDate }
     console.log(`  Only processing donations after: ${minDate.toISOString()}`)
@@ -172,9 +261,16 @@ export async function processDonationMatchingWithPayload(options?: {
   // Get donor IDs - use Payload ID as string, or webflowId if available for backward compatibility
   const donorIds = matchingDonors.map((d) => d.webflowId || d.id.toString())
   
-  // Get already matched amounts
-  const donorMatchedAmountMap = await getDonorsMatchedAmounts(donorIds)
-  console.log('Current matched amounts:', Object.fromEntries(donorMatchedAmountMap))
+  const donorMatchedMap = await getDonorsMatchedAmountsByYear(donorIds)
+  console.log('Current matched amounts (per donor:year):', Object.fromEntries(donorMatchedMap))
+
+  // Per-project donation targets
+  const projectTargetMap = await getProjectTargets()
+  const communityTotals = await getCommunityTotalsByProject()
+  const projectMatchedRunning = await getMatchedTotalsByProject()
+  if (projectTargetMap.size > 0) {
+    console.log('Project targets:', Object.fromEntries(projectTargetMap))
+  }
 
   let matchedCount = 0
   let totalMatchedAmount = 0
@@ -188,34 +284,61 @@ export async function processDonationMatchingWithPayload(options?: {
         continue
       }
 
-      const projectSlug = donation.projectSlug
+      const donationDate = donation.createdAt
+      const projectSlug = donation.projectSlug.trim().toLowerCase()
       console.log(`Processing donation ID ${donation.id}, amount: $${donationAmount.toFixed(2)}, project: ${projectSlug}`)
 
-      // Find eligible donors for this project
+      const donationYear = donationDate.getFullYear()
       const eligibleDonors = matchingDonors.filter((donor) => {
+        const donorStart = new Date(donor.startDate)
+        const donorEnd = new Date(donor.endDate)
+        if (donationDate < donorStart || donationDate > donorEnd) {
+          return false
+        }
         if (donor.matchingType === 'all-projects') {
           return true
         }
-        // Per-project matching - check if project is in supported list
-        const supportedSlugs = getSupportedProjectSlugs(donor)
+        const supportedSlugs = getSupportedProjectSlugs(donor).map((s) => s.trim().toLowerCase())
         return supportedSlugs.includes(projectSlug)
       })
 
       console.log(`  Found ${eligibleDonors.length} eligible donors`)
 
+      // Check per-project donation target
+      const projectTarget = projectTargetMap.get(projectSlug)
+      let projectRoom = Infinity
+      if (projectTarget) {
+        const communityTotal = communityTotals.get(projectSlug) || 0
+        const currentMatched = projectMatchedRunning.get(projectSlug) || 0
+        projectRoom = projectTarget.target - communityTotal - currentMatched
+        if (projectRoom <= 0) {
+          console.log(`  Project "${projectSlug}" target reached ($${projectTarget.target.toFixed(2)}), skipping matching`)
+          if (!dryRun) {
+            await prisma.donation.update({
+              where: { id: donation.id },
+              data: { processed: true },
+            })
+          }
+          continue
+        }
+        console.log(`  Project "${projectSlug}" target: $${projectTarget.target.toFixed(2)}, room for matching: $${projectRoom.toFixed(2)}`)
+      }
+
       let remainingDonationAmount = donationAmount
 
       for (const donor of eligibleDonors) {
-        // Use webflowId for backward compatibility, otherwise use Payload ID
         const donorId = donor.webflowId || donor.id.toString()
+        const yearKey = `${donorId}:${donationYear}`
         const totalMatchingAmount = donor.totalMatchingAmount
-        const alreadyMatchedAmount = donorMatchedAmountMap.get(donorId) || 0
+        const alreadyMatchedAmount = donorMatchedMap.get(yearKey) || 0
         const remainingMatchingAmount = totalMatchingAmount - alreadyMatchedAmount
 
-        console.log(`  Donor ${donor.name} (${donorId}): total=${totalMatchingAmount}, matched=${alreadyMatchedAmount}, remaining=${remainingMatchingAmount}`)
+        console.log(
+          `  Donor ${donor.name} (${donorId}): ${donationYear} pool total=${totalMatchingAmount}, matched=${alreadyMatchedAmount}, remaining=${remainingMatchingAmount}`
+        )
 
         if (remainingMatchingAmount <= 0) {
-          console.log(`    No remaining matching amount, skipping`)
+          console.log(`    No remaining matching amount for ${donationYear}, skipping`)
           continue
         }
 
@@ -226,14 +349,25 @@ export async function processDonationMatchingWithPayload(options?: {
         }
         
         const maxMatchableAmount = remainingMatchingAmount / multiplier
-        const matchAmount = Math.min(remainingDonationAmount, maxMatchableAmount)
+        let matchAmount = Math.min(remainingDonationAmount, maxMatchableAmount)
 
         if (matchAmount <= 0) {
           console.log(`    Cannot match (maxMatchable: ${maxMatchableAmount}), skipping`)
           continue
         }
 
-        const matchedValue = matchAmount * multiplier
+        let matchedValue = matchAmount * multiplier
+
+        // Cap by project target room
+        if (matchedValue > projectRoom) {
+          matchedValue = projectRoom
+          matchAmount = matchedValue / multiplier
+        }
+
+        if (matchedValue <= 0) {
+          break
+        }
+
         console.log(`    Matching $${matchedValue.toFixed(2)} (${multiplier}x multiplier on $${matchAmount.toFixed(2)})`)
 
         if (!dryRun) {
@@ -242,19 +376,20 @@ export async function processDonationMatchingWithPayload(options?: {
               donorId,
               donationId: donation.id,
               matchedAmount: matchedValue,
-              date: new Date(),
+              date: donationDate,
               projectSlug,
             },
           })
         }
 
-        // Update in-memory tracking
-        donorMatchedAmountMap.set(donorId, alreadyMatchedAmount + matchedValue)
+        donorMatchedMap.set(yearKey, alreadyMatchedAmount + matchedValue)
+        projectMatchedRunning.set(projectSlug, (projectMatchedRunning.get(projectSlug) || 0) + matchedValue)
+        projectRoom -= matchedValue
         remainingDonationAmount -= matchAmount
         matchedCount++
         totalMatchedAmount += matchedValue
 
-        if (remainingDonationAmount <= 0) {
+        if (remainingDonationAmount <= 0 || projectRoom <= 0) {
           console.log(`    Donation fully matched`)
           break
         }
@@ -272,6 +407,17 @@ export async function processDonationMatchingWithPayload(options?: {
       const errorMsg = `Error processing donation ID ${donation.id}: ${error}`
       console.error(errorMsg)
       errors.push(errorMsg)
+    }
+  }
+
+  // Mark projects that reached their donation target as funded
+  if (!dryRun) {
+    for (const [slug, target] of projectTargetMap) {
+      const communityTotal = communityTotals.get(slug) || 0
+      const matched = projectMatchedRunning.get(slug) || 0
+      if (communityTotal + matched >= target.target) {
+        await markProjectFunded(target.payloadId, slug)
+      }
     }
   }
 

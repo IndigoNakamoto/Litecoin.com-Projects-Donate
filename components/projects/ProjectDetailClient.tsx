@@ -260,11 +260,13 @@ export default function ProjectDetailClient({
       bountyStatus === BountyStatus.BOUNTY_COMPLETED ||
       bountyStatus === BountyStatus.CLOSED ||
       bountyStatus === BountyStatus.BOUNTY_CLOSED ||
+      bountyStatus === BountyStatus.FUNDED ||
       normalizedStatus === 'completed' ||
       normalizedStatus === 'bounty completed' ||
       normalizedStatus === 'closed' ||
       normalizedStatus === 'bounty closed' ||
-      normalizedStatus === 'archived'
+      normalizedStatus === 'archived' ||
+      normalizedStatus === 'funding target reached'
     
     if (isCompletedOrClosed) {
       return // Don't open the modal for completed/closed projects
