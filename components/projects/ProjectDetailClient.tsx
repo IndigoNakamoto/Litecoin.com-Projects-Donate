@@ -121,6 +121,9 @@ export default function ProjectDetailClient({
   const recurringAmountGoal = extendedProject.recurringAmountGoal
   const litecoinRaised = project.litecoinRaised ?? 0
   const litecoinPaid = project.litecoinPaid ?? 0
+  const donationTarget = project.donationTarget
+  const fundingProgressReady =
+    addressStats !== undefined && matchingDonors !== undefined
 
   // Fetch donations, contributors, and supporters
   useEffect(() => {
@@ -375,6 +378,8 @@ export default function ProjectDetailClient({
           timeLeftInMonth={timeLeftInMonth}
           bountyStatus={bountyStatus as BountyStatus}
           projectStatus={project.status}
+          donationTarget={donationTarget}
+          fundingProgressReady={fundingProgressReady}
           openPaymentModal={openPaymentModal}
         />
       </article>

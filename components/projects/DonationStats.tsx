@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import FundingTargetProgress from './FundingTargetProgress'
 import { AddressStats } from '@/utils/types'
 import { defaultAddressStats } from '@/utils/defaultValues'
 
@@ -29,6 +30,8 @@ const StandardStats: React.FC<
     formatLits?: (value: number) => string
     litecoinRaised?: number
     litecoinPaid?: number
+    donationTarget?: number
+    fundingProgressReady?: boolean
     matchingDonors?: {
       totalMatchedAmount: number
       donorFieldData: { name: string }
@@ -40,6 +43,8 @@ const StandardStats: React.FC<
   formatLits,
   litecoinRaised = 0,
   litecoinPaid = 0,
+  donationTarget,
+  fundingProgressReady = false,
   matchingDonors = [],
   totalPaid = 0,
 }) => {
@@ -68,12 +73,35 @@ const StandardStats: React.FC<
   const hasLtcPaid = litecoinPaid > 0 && !!formatLits
   const hasUsdPaid = totalPaid > 0
 
+  const showFundingTarget =
+    donationTarget != null && donationTarget > 0
+
+  const totalRaisedTowardTarget =
+    Math.round((communityRaisedUSD + totalMatched) * 100) / 100
+
   return (
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-5">
         <h3 className="font-space-grotesk text-lg font-bold text-gray-800">
           Funding Summary
         </h3>
+        {showFundingTarget && (
+          <div>
+            {fundingProgressReady ? (
+              <FundingTargetProgress
+                current={totalRaisedTowardTarget}
+                target={donationTarget}
+                formatUSD={formatUSD}
+              />
+            ) : (
+              <div
+                className="h-1.5 w-full animate-pulse rounded-sm bg-gray-400/50"
+                aria-busy="true"
+                aria-label="Loading funding progress"
+              />
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-4">
           <StatItem
             value={addressStats.tx_count || 0}
@@ -131,6 +159,8 @@ type DonationStatsProps = {
   isRecurring?: boolean
   litecoinRaised?: number
   litecoinPaid?: number
+  donationTarget?: number
+  fundingProgressReady?: boolean
   matchingDonors?: {
     totalMatchedAmount: number
     donorFieldData: { name: string }

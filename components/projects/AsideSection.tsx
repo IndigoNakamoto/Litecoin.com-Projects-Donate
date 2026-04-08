@@ -30,6 +30,8 @@ type AsideSectionProps = {
   bountyStatus?: BountyStatus
   projectStatus?: string
   totalPaid?: number
+  donationTarget?: number
+  fundingProgressReady?: boolean
   openPaymentModal: () => void
 }
 
@@ -55,6 +57,8 @@ const AsideSection: React.FC<AsideSectionProps> = ({
   monthlyDonorCount,
   timeLeftInMonth,
   totalPaid,
+  donationTarget,
+  fundingProgressReady,
   openPaymentModal,
 }) => {
   return (
@@ -92,6 +96,8 @@ const AsideSection: React.FC<AsideSectionProps> = ({
             monthlyDonorCount={monthlyDonorCount}
             timeLeftInMonth={timeLeftInMonth}
             totalPaid={totalPaid}
+            donationTarget={donationTarget}
+            fundingProgressReady={fundingProgressReady}
           />
         </div>
 
