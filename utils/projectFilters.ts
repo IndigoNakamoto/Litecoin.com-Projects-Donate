@@ -38,7 +38,8 @@ export function isPastProject(project: Project): boolean {
     'Bounty Closed', 
     'Bounty Completed', 
     'Closed', 
-    'Completed'
+    'Completed',
+    'Funding Target Reached'
   ]
   
   const isMatch = completedStatuses.includes(normalizedStatus)

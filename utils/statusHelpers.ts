@@ -31,6 +31,8 @@ export function determineBountyStatus(
       return BountyStatus.COMPLETED
     case 'Bounty Completed':
       return BountyStatus.BOUNTY_COMPLETED
+    case 'Funding Target Reached':
+      return BountyStatus.FUNDED
     default:
       return undefined
   }
@@ -45,10 +47,12 @@ export function isButtonDisabled(bountyStatus?: BountyStatus, projectStatus?: st
     bountyStatus === BountyStatus.BOUNTY_COMPLETED ||
     bountyStatus === BountyStatus.CLOSED ||
     bountyStatus === BountyStatus.BOUNTY_CLOSED ||
+    bountyStatus === BountyStatus.FUNDED ||
     bountyStatusValue === 'Completed' ||
     bountyStatusValue === 'Bounty Completed' ||
     bountyStatusValue === 'Closed' ||
-    bountyStatusValue === 'Bounty Closed'
+    bountyStatusValue === 'Bounty Closed' ||
+    bountyStatusValue === 'Funding Target Reached'
   ) {
     return true
   }
@@ -61,7 +65,8 @@ export function isButtonDisabled(bountyStatus?: BountyStatus, projectStatus?: st
       normalizedStatus === 'bounty completed' ||
       normalizedStatus === 'closed' ||
       normalizedStatus === 'bounty closed' ||
-      normalizedStatus === 'archived'
+      normalizedStatus === 'archived' ||
+      normalizedStatus === 'funding target reached'
     ) {
       return true
     }
@@ -86,7 +91,13 @@ export function getButtonText(bountyStatus?: BountyStatus, projectStatus?: strin
     normalizedStatus === 'bounty closed' ||
     normalizedStatus === 'archived'
   
-  if (isCompleted) {
+  const isFunded =
+    bountyStatus === BountyStatus.FUNDED ||
+    normalizedStatus === 'funding target reached'
+
+  if (isFunded) {
+    return 'FUNDING TARGET REACHED'
+  } else if (isCompleted) {
     return 'PROJECT COMPLETED'
   } else if (isClosed) {
     return 'PROJECT CLOSED'

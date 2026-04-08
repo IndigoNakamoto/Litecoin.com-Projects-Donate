@@ -179,15 +179,15 @@ async function getMatchedTotalsByProject(): Promise<Map<string, number>> {
 }
 
 /**
- * Update project status to 'completed' in Payload CMS.
+ * Update project status to 'funded' (Funding Target Reached) in Payload CMS.
  */
-async function markProjectCompleted(payloadId: number, slug: string): Promise<void> {
+async function markProjectFunded(payloadId: number, slug: string): Promise<void> {
   const client = createPayloadClient()
   try {
-    await client.patch(`/projects/${payloadId}`, { status: 'completed' })
-    console.log(`Auto-completed project "${slug}" (Payload ID ${payloadId})`)
+    await client.patch(`/projects/${payloadId}`, { status: 'funded' })
+    console.log(`Project "${slug}" funding target reached (Payload ID ${payloadId})`)
   } catch (error) {
-    console.warn(`Failed to auto-complete project "${slug}" in Payload (may need write-access token):`, error)
+    console.warn(`Failed to update project "${slug}" status in Payload (may need write-access token):`, error)
   }
 }
 
@@ -410,13 +410,13 @@ export async function processDonationMatchingWithPayload(options?: {
     }
   }
 
-  // Auto-complete projects that reached their donation target
+  // Mark projects that reached their donation target as funded
   if (!dryRun) {
     for (const [slug, target] of projectTargetMap) {
       const communityTotal = communityTotals.get(slug) || 0
       const matched = projectMatchedRunning.get(slug) || 0
       if (communityTotal + matched >= target.target) {
-        await markProjectCompleted(target.payloadId, slug)
+        await markProjectFunded(target.payloadId, slug)
       }
     }
   }

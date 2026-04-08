@@ -14,6 +14,7 @@ export enum BountyStatus {
   BOUNTY_CLOSED = 'Bounty Closed',
   COMPLETED = 'Completed',
   BOUNTY_COMPLETED = 'Bounty Completed',
+  FUNDED = 'Funding Target Reached',
 }
 
 export enum BugSeverity {

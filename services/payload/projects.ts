@@ -112,6 +112,7 @@ async function transformProject(
   const mapPayloadStatusToWebflow = (payloadStatus: string): string => {
     const statusMap: Record<string, string> = {
       'active': 'Open',
+      'funded': 'Funding Target Reached',
       'completed': 'Completed',
       'paused': 'Closed',
       'archived': 'Closed',

@@ -13,7 +13,7 @@ export interface PayloadProject {
     url: string
     alt?: string
   }
-  status: 'active' | 'completed' | 'paused' | 'archived'
+  status: 'active' | 'funded' | 'completed' | 'paused' | 'archived'
   projectType?: 'open-source' | 'research' | 'education' | 'infrastructure'
   hidden: boolean
   recurring: boolean
