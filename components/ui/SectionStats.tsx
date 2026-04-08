@@ -24,7 +24,7 @@ function SectionStats() {
     })
 
     try {
-      const response = await fetch('/api/stats')
+      const response = await fetch('/api/stats', { cache: 'no-store' })
       if (!response.ok) {
         throw new Error('Failed to fetch stats')
       }
@@ -41,7 +41,7 @@ function SectionStats() {
             : null,
         donationsMatched:
           data.donationsMatched !== undefined && data.donationsMatched !== null
-            ? formatter.format(data.donationsMatched)
+            ? formatter.format(Number(data.donationsMatched))
             : null,
       })
     } catch (error) {

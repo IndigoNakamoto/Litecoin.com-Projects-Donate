@@ -21,6 +21,7 @@ export interface PayloadProject {
   serviceFeesCollected: number
   litecoinRaised?: number
   litecoinPaid?: number
+  donationTarget?: number
   website?: string
   github?: string
   twitter?: string

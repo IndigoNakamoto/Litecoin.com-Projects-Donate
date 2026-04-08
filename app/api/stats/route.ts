@@ -13,8 +13,17 @@ interface Stats {
 }
 
 export async function GET(request: NextRequest) {
+  const statsCacheHeaders = (): Record<string, string> => {
+    const noStore =
+      process.env.DISABLE_VERCEL_KV === '1' ||
+      process.env.DISABLE_VERCEL_KV === 'true'
+    return noStore
+      ? { 'Cache-Control': 'no-store, must-revalidate' }
+      : { 'Cache-Control': 's-maxage=600, stale-while-revalidate' }
+  }
+
   // Bump cache key to avoid serving previously cached incorrect values
-  const cacheKey = 'stats:all:v6'
+  const cacheKey = 'stats:all:v8'
   const debug =
     process.env.NODE_ENV !== 'production' &&
     request.nextUrl.searchParams.get('debug') === '1'
@@ -25,9 +34,7 @@ export async function GET(request: NextRequest) {
       const cachedStats = await kv.get<Stats>(cacheKey)
       if (cachedStats && !debug) {
         return NextResponse.json(cachedStats, {
-          headers: {
-            'Cache-Control': 's-maxage=600, stale-while-revalidate',
-          },
+          headers: statsCacheHeaders(),
         })
       }
     } catch {
@@ -48,13 +55,29 @@ export async function GET(request: NextRequest) {
     const projectsSupported = projects.length
 
     // Calculate donations raised and matched
-    // Try API first, fallback to direct database if API unavailable
+    // Prefer MatchingDonationLog total from this app's DATABASE_URL (Prisma). The remote
+    // DATABASE_API_URL may point at a different or partial DB, which previously understated
+    // "Donations Matched". Set STATS_MATCHING_FROM_DB=0 to use API-only matching for local dev.
     let donationsRaised = 0
     let donationsMatched: number | null = null
 
+    const matchFromDb =
+      process.env.STATS_MATCHING_FROM_DB !== 'false' &&
+      process.env.STATS_MATCHING_FROM_DB !== '0'
+
+    if (matchFromDb) {
+      try {
+        const { getMatchedDonations } = await import('@/lib/reports')
+        donationsMatched = await getMatchedDonations()
+      } catch (e) {
+        console.warn('[stats] getMatchedDonations failed:', e)
+        donationsMatched = null
+      }
+    }
+
     const debugInfo: Record<string, unknown> | undefined = debug
       ? {
-          version: 'stats-debug-v6-api',
+          version: 'stats-debug-v8-api',
           used: null,
           tables: null,
           donationPledge: null,
@@ -74,10 +97,19 @@ export async function GET(request: NextRequest) {
       
       if (apiResponse.ok) {
         const apiStats = await apiResponse.json()
-        donationsRaised = apiStats.donationsRaised || 0
-        donationsMatched = apiStats.donationsMatched ?? null
+        donationsRaised = Number(apiStats.donationsRaised) || 0
+        if (!matchFromDb || donationsMatched === null) {
+          const m = apiStats.donationsMatched
+          donationsMatched =
+            m !== undefined && m !== null ? Number(m) : donationsMatched
+        }
         console.log('[stats] API response:', { donationsRaised, donationsMatched })
-        if (debugInfo) debugInfo.used = 'database-api'
+        if (debugInfo) {
+          debugInfo.used =
+            matchFromDb && donationsMatched !== null
+              ? 'database-api(raised)+prisma(matched)'
+              : 'database-api'
+        }
       } else {
         throw new Error(`API returned ${apiResponse.status}`)
       }
@@ -301,7 +333,7 @@ export async function GET(request: NextRequest) {
               ELSE 0 END
             )::float AS sum_processed,
             SUM(
-              CASE WHEN status IN ('Complete', 'Advanced') THEN
+              CASE WHEN status IN ('Complete', 'Advanced', 'COMPLETED') THEN
                 COALESCE(
                   value_at_donation_time_usd,
                   "pledgeAmount",
@@ -346,17 +378,16 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Choose the best available sum
-        // (success is often the most reliable across donation types)
-        if (sumSuccess > 0) {
+        // Prefer status Complete/Advanced/COMPLETED over legacy success flag
+        if (sumComplete > 0) {
+          donationsRaised = sumComplete
+          if (debugInfo) debugInfo.used = 'legacy:donations(complete)'
+        } else if (sumSuccess > 0) {
           donationsRaised = sumSuccess
           if (debugInfo) debugInfo.used = 'legacy:donations(success)'
         } else if (sumProcessed > 0) {
           donationsRaised = sumProcessed
           if (debugInfo) debugInfo.used = 'legacy:donations(processed)'
-        } else if (sumComplete > 0) {
-          donationsRaised = sumComplete
-          if (debugInfo) debugInfo.used = 'legacy:donations(complete)'
         } else if (sumAny > 0) {
           donationsRaised = sumAny
           if (debugInfo) debugInfo.used = 'legacy:donations(any)'
@@ -398,82 +429,81 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Matching donations: try legacy table if present. (New schema doesn’t
-      // currently model matching logs.)
-      try {
-        if (debugInfo) {
-          try {
-            const matchingColumns = await prisma.$queryRaw<
-              { column_name: string; data_type: string; is_nullable: string }[]
-            >`
-              SELECT column_name, data_type, is_nullable
-              FROM information_schema.columns
-              WHERE table_schema = 'public'
-                AND table_name = 'MatchingDonationLog'
-              ORDER BY ordinal_position
-            `
+      // Matching donations: only if still unknown (do not overwrite getMatchedDonations)
+      if (donationsMatched === null) {
+        try {
+          if (debugInfo) {
+            try {
+              const matchingColumns = await prisma.$queryRaw<
+                { column_name: string; data_type: string; is_nullable: string }[]
+              >`
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'MatchingDonationLog'
+                ORDER BY ordinal_position
+              `
 
-            const matchingCount = await prisma.$queryRaw<{ total: number }[]>`
-              SELECT COUNT(*)::int AS total
-              FROM "MatchingDonationLog"
-            `
+              const matchingCount = await prisma.$queryRaw<{ total: number }[]>`
+                SELECT COUNT(*)::int AS total
+                FROM "MatchingDonationLog"
+              `
 
-            const sample = await prisma.$queryRaw<Record<string, unknown>[]>`
-              SELECT *
-              FROM "MatchingDonationLog"
-              ORDER BY 1 DESC
-              LIMIT 3
-            `
+              const sample = await prisma.$queryRaw<Record<string, unknown>[]>`
+                SELECT *
+                FROM "MatchingDonationLog"
+                ORDER BY 1 DESC
+                LIMIT 3
+              `
 
-            debugInfo.legacyMatching = {
-              columns: matchingColumns,
-              counts: matchingCount?.[0] ?? null,
-              sample,
+              debugInfo.legacyMatching = {
+                columns: matchingColumns,
+                counts: matchingCount?.[0] ?? null,
+                sample,
+              }
+            } catch (e) {
+              ;(debugInfo.errors as unknown[]).push({
+                where: 'debug:MatchingDonationLog-introspection',
+                message: e instanceof Error ? e.message : String(e),
+              })
             }
-          } catch (e) {
+          }
+
+          console.log('[stats] Executing matching donations query (fallback)...')
+          const matchedRows = await prisma.$queryRaw<{ total: unknown }[]>`
+            SELECT COALESCE(SUM("matchedAmount"), 0)::numeric AS total
+            FROM "MatchingDonationLog"
+          `
+          console.log('[stats] Matching query raw result:', matchedRows)
+          const raw = matchedRows?.[0]?.total
+          const n =
+            raw != null && typeof raw === 'object' && 'toNumber' in raw
+              ? (raw as { toNumber: () => number }).toNumber()
+              : Number(raw ?? 0)
+          donationsMatched = Number.isFinite(n) ? n : 0
+
+          console.log('[stats] Matching donations query result:', {
+            rawTotal: matchedRows?.[0]?.total,
+            donationsMatched,
+          })
+
+          if (debugInfo) {
+            const prev =
+              typeof debugInfo.legacyMatching === 'object' && debugInfo.legacyMatching
+                ? (debugInfo.legacyMatching as Record<string, unknown>)
+                : {}
+            debugInfo.legacyMatching = { ...prev, sum: donationsMatched }
+          }
+        } catch (error) {
+          console.error('[stats] Error querying MatchingDonationLog:', error)
+          if (debugInfo) {
             ;(debugInfo.errors as unknown[]).push({
-              where: 'debug:MatchingDonationLog-introspection',
-              message: e instanceof Error ? e.message : String(e),
+              where: 'legacy:MatchingDonationLog-query',
+              message: error instanceof Error ? error.message : String(error),
             })
           }
+          donationsMatched = null
         }
-
-        // Your DB uses camelCase columns ("matchedAmount") as shown in debug output.
-        // Note: Column name must be quoted because it's camelCase
-        console.log('[stats] Executing matching donations query...')
-        const matchedRows = await prisma.$queryRaw<{ total: number | null }[]>`
-          SELECT SUM("matchedAmount")::float AS total
-          FROM "MatchingDonationLog"
-        `
-        console.log('[stats] Matching query raw result:', matchedRows)
-        donationsMatched = matchedRows?.[0]?.total ?? null
-        // Convert null to 0 if needed, but keep null to distinguish from "no data"
-        if (donationsMatched === null) {
-          donationsMatched = 0
-        }
-        
-        // Log the matched amount for debugging
-        console.log('[stats] Matching donations query result:', {
-          rawTotal: matchedRows?.[0]?.total,
-          donationsMatched,
-        })
-
-        if (debugInfo) {
-          const prev =
-            typeof debugInfo.legacyMatching === 'object' && debugInfo.legacyMatching
-              ? (debugInfo.legacyMatching as Record<string, unknown>)
-              : {}
-          debugInfo.legacyMatching = { ...prev, sum: donationsMatched }
-        }
-      } catch (error) {
-        console.error('[stats] Error querying MatchingDonationLog:', error)
-        if (debugInfo) {
-          ;(debugInfo.errors as unknown[]).push({
-            where: 'legacy:MatchingDonationLog-query',
-            message: error instanceof Error ? error.message : String(error),
-          })
-        }
-        donationsMatched = null
       }
       } catch (fallbackError) {
         console.error('[stats] Direct database fallback also failed:', fallbackError)
@@ -510,13 +540,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (debugInfo) {
-      return NextResponse.json({ ...stats, _debug: debugInfo }, { status: 200 })
+      return NextResponse.json({ ...stats, _debug: debugInfo }, {
+        status: 200,
+        headers: statsCacheHeaders(),
+      })
     }
 
     return NextResponse.json(stats, {
-      headers: {
-        'Cache-Control': 's-maxage=600, stale-while-revalidate',
-      },
+      headers: statsCacheHeaders(),
     })
   } catch (error: unknown) {
     console.error('[stats] Error fetching stats:', error)

@@ -144,6 +144,7 @@ async function transformProject(
     serviceFeesCollected: payloadProject.serviceFeesCollected,
     litecoinRaised: payloadProject.litecoinRaised ?? 0,
     litecoinPaid: payloadProject.litecoinPaid ?? 0,
+    donationTarget: payloadProject.donationTarget,
     website: payloadProject.website,
     github: payloadProject.github,
     twitter: payloadProject.twitter,
