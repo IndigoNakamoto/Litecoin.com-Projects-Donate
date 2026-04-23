@@ -18,6 +18,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Litecoin Fund",
   description: "Open Source Projects, Bounties, and Initiatives for the Litecoin Ecosystem",
+  // Served under /static/ so the litecoin.com Cloudflare worker (which only forwards
+  // /donate, /projects, /_next, /api, /static) routes them to this origin.
+  icons: {
+    icon: [
+      { url: "/static/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/static/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/static/favicons/favicon-litecoin.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/static/favicons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/static/favicons/site.webmanifest",
 };
 
 export default function RootLayout({
