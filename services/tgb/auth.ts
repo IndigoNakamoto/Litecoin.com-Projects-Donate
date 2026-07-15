@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { addSeconds, isBefore } from 'date-fns'
 import { prisma } from '@/lib/prisma'
+import { tgbHttpsAgent } from '@/services/tgb/httpsAgent'
 
 interface TokenRecord {
   id: number
@@ -77,9 +78,11 @@ export async function getAccessToken(): Promise<string> {
 
 async function refreshAccessToken(refreshToken: string): Promise<string> {
   try {
-    const response = await axios.post(`${TGB_API_BASE}/refresh-tokens`, {
-      refreshToken,
-    })
+    const response = await axios.post(
+      `${TGB_API_BASE}/refresh-tokens`,
+      { refreshToken },
+      { httpsAgent: tgbHttpsAgent }
+    )
 
     const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
       response.data.data
@@ -146,10 +149,11 @@ async function loginAndSaveTokens(): Promise<string> {
       throw new Error('GIVING_BLOCK_LOGIN and GIVING_BLOCK_PASSWORD environment variables must be set')
     }
 
-    const response = await axios.post(`${TGB_API_BASE}/login`, {
-      login,
-      password,
-    })
+    const response = await axios.post(
+      `${TGB_API_BASE}/login`,
+      { login, password },
+      { httpsAgent: tgbHttpsAgent }
+    )
 
     if (!response.data?.data?.accessToken) {
       console.error('[TGB Auth] Unexpected response structure:', response.data)
@@ -219,8 +223,12 @@ async function loginAndSaveTokens(): Promise<string> {
       throw new Error(`TGB API error (${error.response.status}): ${error.response?.data?.message || error.response?.data?.error || error.message}`)
     } else if (error.message?.includes('GIVING_BLOCK')) {
       throw error // Re-throw the environment variable error as-is
-    } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-      throw new Error(`Network error connecting to TGB API: ${error.message}`)
+    } else if (
+      error.code === 'ECONNREFUSED' ||
+      error.code === 'ENOTFOUND' ||
+      error.code === 'ETIMEDOUT'
+    ) {
+      throw new Error(`Network error connecting to TGB API (${error.code}): ${error.message}`)
     } else {
       throw new Error(`Unable to obtain access token: ${error.message || 'Unknown error'}`)
     }
