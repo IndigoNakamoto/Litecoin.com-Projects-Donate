@@ -265,8 +265,10 @@ interface DonationProviderProps {
 export const DonationProvider: React.FC<DonationProviderProps> = ({
   children,
 }) => {
-  const isTerminalStep = (step: DonationState['currentStep']) =>
-    step === 'complete' || step === 'thankYou'
+  // Steps that should not be restored from localStorage on a new page load.
+  // cryptoDonate is included so "donate again" always requests a new deposit address.
+  const isNonRehydratableStep = (step: DonationState['currentStep']) =>
+    step === 'complete' || step === 'thankYou' || step === 'cryptoDonate'
 
   const initializer = (initialValue: DonationState) => {
     if (typeof window !== 'undefined') {
@@ -276,9 +278,8 @@ export const DonationProvider: React.FC<DonationProviderProps> = ({
       try {
         const parsed = JSON.parse(savedState) as DonationState
 
-        // Never rehydrate into a terminal "thank you" step; start fresh instead.
-        // This prevents the flow from getting stuck on refresh after a completed donation.
-        if (parsed?.currentStep && isTerminalStep(parsed.currentStep)) {
+        // Never rehydrate into thank-you or a prior crypto deposit screen.
+        if (parsed?.currentStep && isNonRehydratableStep(parsed.currentStep)) {
           return initialValue
         }
 
@@ -298,8 +299,8 @@ export const DonationProvider: React.FC<DonationProviderProps> = ({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Don't persist terminal states; otherwise refresh will re-open the thank-you step.
-      if (isTerminalStep(state.currentStep)) {
+      // Don't persist terminal / deposit-address steps; refresh starts a fresh donate flow.
+      if (isNonRehydratableStep(state.currentStep)) {
         localStorage.removeItem('donationState')
         return
       }

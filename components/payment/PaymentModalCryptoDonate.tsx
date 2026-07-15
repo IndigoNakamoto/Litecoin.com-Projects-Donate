@@ -19,8 +19,14 @@ const PaymentModalCryptoDonate: React.FC<PaymentModalCryptoDonateProps> = ({
   const { state, dispatch } = useDonation()
 
   const depositAddress = state.donationData?.depositAddress || ''
-  const pledgeAmount = state.formData?.pledgeAmount || ''
+  const pledgeAmount =
+    state.formData?.pledgeAmount || state.donationData?.pledgeAmount || ''
   const pledgeCurrency = state.formData?.assetName || ''
+  const assetSymbol = (
+    state.formData?.assetSymbol ||
+    state.formData?.pledgeCurrency ||
+    ''
+  ).toUpperCase()
   const qrCode = state.donationData?.qrCode || ''
 
   const [copied, setCopied] = useState<{ address: boolean; amount: boolean }>({
@@ -57,11 +63,18 @@ const PaymentModalCryptoDonate: React.FC<PaymentModalCryptoDonateProps> = ({
     [depositAddress, pledgeAmount]
   )
 
-  const qrCodeCurrencies = ['bitcoin', 'litecoin', 'dogecoin']
+  // BIP21 URI schemes keyed by asset symbol (not display name)
+  const bip21Schemes: Record<string, string> = {
+    BTC: 'bitcoin',
+    LTC: 'litecoin',
+    DOGE: 'dogecoin',
+  }
+  const bip21Scheme = bip21Schemes[assetSymbol]
+  const useClientQr = Boolean(bip21Scheme)
 
   let qrValue = depositAddress
-  if (qrCodeCurrencies.includes(pledgeCurrency.toLowerCase())) {
-    qrValue = `${pledgeCurrency.toLowerCase()}:${depositAddress}?amount=${pledgeAmount}`
+  if (bip21Scheme && depositAddress) {
+    qrValue = `${bip21Scheme}:${depositAddress}?amount=${pledgeAmount}`
   }
 
   const CopyableField = ({
@@ -113,14 +126,18 @@ const PaymentModalCryptoDonate: React.FC<PaymentModalCryptoDonateProps> = ({
           Please send your donation to the following address:
         </p>
 
-        {qrCodeCurrencies.includes(pledgeCurrency.toLowerCase()) ? (
+        {useClientQr ? (
           <>
-            <QRCodeSVG
-              value={qrValue}
-              size={256}
-              bgColor="#000"
-              fgColor="#f2f2f2"
-            />
+            {/* Standard dark-on-light QR with a slim quiet zone */}
+            <div className="rounded-sm bg-[#fff] p-1">
+              <QRCodeSVG
+                value={qrValue}
+                size={256}
+                bgColor="#ffffff"
+                fgColor="#000000"
+                marginSize={1}
+              />
+            </div>
             {/* NEW REMINDER MESSAGE */}
             <p className="mt-2 text-sm font-semibold text-[#000]">
               IMPORTANT: Please only send exactly {formattedPledgeAmount}{' '}

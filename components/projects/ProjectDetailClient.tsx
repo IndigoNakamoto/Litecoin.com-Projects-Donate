@@ -275,6 +275,9 @@ export default function ProjectDetailClient({
       return // Don't open the modal for completed/closed projects
     }
 
+    // Fresh donate session so a prior crypto address is not reused
+    dispatch({ type: 'RESET_DONATION_STATE' })
+
     setSelectedProject(project)
     setModalOpen(true)
 

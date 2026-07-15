@@ -312,13 +312,38 @@ const PaymentModalPersonalInfo: React.FC<
       }
     }
 
-    dispatch({
-      type: 'SET_DONATION_DATA',
-      payload: {
-        ...state.donationData,
-        ...formData,
-      },
-    })
+    // For crypto, clear any prior deposit so a retry cannot flash a stale address/QR
+    if (selectedOption === 'crypto') {
+      dispatch({
+        type: 'SET_DONATION_DATA',
+        payload: {
+          ...state.donationData,
+          ...formData,
+          depositAddress: '',
+          qrCode: '',
+          pledgeId: '',
+          pledgeAmount: resolvedPledgeAmount,
+          pledgeCurrency: formData.assetSymbol,
+        },
+      })
+      dispatch({
+        type: 'SET_FORM_DATA',
+        payload: {
+          pledgeAmount: resolvedPledgeAmount,
+          assetSymbol: formData.assetSymbol,
+          assetName: formData.assetName,
+          pledgeCurrency: formData.assetSymbol,
+        },
+      })
+    } else {
+      dispatch({
+        type: 'SET_DONATION_DATA',
+        payload: {
+          ...state.donationData,
+          ...formData,
+        },
+      })
+    }
 
     let apiEndpoint = ''
     let apiBody = {}
@@ -454,12 +479,22 @@ const PaymentModalPersonalInfo: React.FC<
           dispatch({ type: 'SET_STEP', payload: 'fiatDonate' })
         } else if (selectedOption === 'crypto' && data?.depositAddress) {
           dispatch({
+            type: 'SET_FORM_DATA',
+            payload: {
+              pledgeAmount: resolvedPledgeAmount,
+              assetSymbol: formData.assetSymbol,
+              assetName: formData.assetName,
+              pledgeCurrency: formData.assetSymbol,
+            },
+          })
+          dispatch({
             type: 'SET_DONATION_DATA',
             payload: {
-              ...state.donationData,
               depositAddress: data.depositAddress,
               qrCode: data.qrCode,
-              ...state.formData,
+              pledgeId: data.pledgeId,
+              pledgeAmount: resolvedPledgeAmount,
+              pledgeCurrency: formData.assetSymbol,
             },
           })
           dispatch({ type: 'SET_STEP', payload: 'cryptoDonate' })

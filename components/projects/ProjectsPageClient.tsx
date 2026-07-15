@@ -40,6 +40,8 @@ export default function ProjectsPageClient({ projects }: ProjectsPageClientProps
 
   const openPaymentModal = useCallback((_project?: Project) => {
     const project = LITECOIN_FOUNDATION_PROJECT
+    // Fresh donate session so a prior crypto address is not reused
+    dispatch({ type: 'RESET_DONATION_STATE' })
     dispatch({
       type: 'SET_PROJECT_DETAILS',
       payload: {
