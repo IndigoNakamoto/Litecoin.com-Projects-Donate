@@ -1,22 +1,23 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
 import { usePayloadCMS } from '@/services/cms/config'
+import { requireCronAuth } from '@/lib/cron-auth'
 
 /**
  * API route to clear project-related caches
- * 
- * This is useful when:
- * - Project statuses have changed
- * - Projects have been updated in Webflow/Payload CMS
- * - Cache needs to be invalidated for testing
- * 
+ *
+ * Requires Authorization: Bearer ${CRON_SECRET}
+ *
  * Usage:
  * - GET /api/cache/clear - Clears all project caches (prioritizes active CMS)
  * - GET /api/cache/clear?key=webflow:projects:published - Clears specific cache key
  * - GET /api/cache/clear?pattern=webflow:* - Clears all keys matching pattern
  * - GET /api/cache/clear?all=true - Clears all caches regardless of active CMS
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const { searchParams } = new URL(request.url)
     const key = searchParams.get('key')

@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
+import { requireCronAuth } from '@/lib/cron-auth'
 
 /**
  * POST /api/clearKV
  * Clear KV cache keys
- * 
- * Called by Vercel cron jobs every 12 hours (schedule: 0 *\/12 * * *)
- * Also supports manual calls with authentication
+ *
+ * Called by Vercel cron jobs; requires Authorization: Bearer ${CRON_SECRET}
  */
 export async function POST(request: NextRequest) {
-  // Authenticate the request using Authorization header (if CRON_SECRET is set)
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  
-  if (cronSecret) {
-    const expectedAuthHeader = `Bearer ${cronSecret}`
-    if (authHeader !== expectedAuthHeader) {
-      console.log(`[clearKV] Unauthorized access attempt at ${new Date().toISOString()}`)
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-  }
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
 
   const clearedKeys: string[] = []
 
@@ -67,12 +55,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Note: We don't call res.revalidate() here because:
-    // 1. It can cause 404s if CMS API is temporarily unavailable during revalidation
-    // 2. Pages have ISR with revalidate: 600, so they'll regenerate naturally
-    // 3. The next request to each page will trigger regeneration with fresh cache
-    // 4. This prevents the race condition where cache is cleared but revalidation fails
-
     console.log(
       `[clearKV] Cache clearing completed at ${new Date().toISOString()}. Cleared ${clearedKeys.length} keys. Pages will regenerate naturally via ISR on next request.`
     )
@@ -95,4 +77,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

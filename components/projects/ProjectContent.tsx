@@ -6,6 +6,7 @@ import ProjectSocialLinks from './ProjectSocialLinks'
 import ProjectContributors from './ProjectContributors'
 import Notification from '@/components/ui/Notification'
 import type { Contributor } from '@/types/project'
+import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 type ProjectContentProps = {
   title: string
@@ -129,7 +130,10 @@ const ProjectContent: React.FC<ProjectContentProps> = ({
         </div>
       </div>
       {content && content.trim() && (
-        <div className="markdown" dangerouslySetInnerHTML={{ __html: content }} />
+        <div
+          className="markdown"
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
+        />
       )}
       <ProjectContributors
         bitcoinContributors={bitcoinContributors}

@@ -1,22 +1,8 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const ContentSecurityPolicy = `
-  default-src 'self';
-  script-src 'self' 'unsafe-eval' 'unsafe-inline' giscus.app https://dev.shift4.com https://js.dev.shift4.com https://widget.thegivingblock.com https://vercel.live https://va.vercel-scripts.com https://static.cloudflareinsights.com;
-  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  img-src 'self' https://pbs.twimg.com https://unavatar.io https://abs.twimg.com https://static.tgb-preprod.com https://static.tgbwidget.com https://cdn.prod.website-files.com https://litecoin.com https://litecoin.net https://uploads-ssl.webflow.com https://static.webflow.com https://images.webflow.com https://dev.shift4.com https://t.dev.shift4.com http://localhost:3011 http://127.0.0.1:3011 blob: data:;
-  media-src 'self' https://video.twimg.com;
-  connect-src 'self' https://react-tweet.vercel.app https://vitals.vercel-insights.com https://public-api.tgbwidget.com https://dev.shift4.com https://t.dev.shift4.com https://js.dev.shift4.com https://cloudflareinsights.com;
-  font-src 'self' https://fonts.gstatic.com;
-  frame-src giscus.app https://dev.shift4.com https://js.dev.shift4.com https://widget.thegivingblock.com https://www.youtube.com https://www.youtube-nocookie.com https://www.redditmedia.com/;
-`;
-
+// CSP is set in middleware.ts with a per-request nonce (no unsafe-inline/unsafe-eval).
 const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: ContentSecurityPolicy.replace(/\n/g, ''),
-  },
   {
     key: 'Referrer-Policy',
     value: 'strict-origin-when-cross-origin',
@@ -78,20 +64,6 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; " +
-              "script-src 'self' https://dev.shift4.com https://js.dev.shift4.com https://vercel.live; " +
-              "connect-src 'self' https://public-api.tgbwidget.com https://dev.shift4.com https://t.dev.shift4.com https://js.dev.shift4.com; " +
-              "img-src 'self' https://dev.shift4.com https://t.dev.shift4.com; " +
-              "style-src 'self' 'unsafe-inline';",
-          },
-        ],
-      },
       {
         source: '/:path*',
         headers: securityHeaders,

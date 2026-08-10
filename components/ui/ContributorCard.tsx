@@ -63,8 +63,6 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, backgrou
         return 'LinkedIn'
       case 'youtube':
         return 'YouTube'
-      case 'email':
-        return normalizedUrl
       default:
         return normalizedUrl
     }
@@ -76,7 +74,6 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, backgrou
     { kind: 'discord', url: contributor.discordLink },
     { kind: 'youtube', url: contributor.youtubeLink },
     { kind: 'linkedin', url: contributor.linkedinLink },
-    { kind: 'email', url: contributor.email },
   ].filter((link) => link.url)
 
   return (

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { lexicalToHtml } from '@/utils/lexicalToHtml'
+import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 type FAQItem = {
   question: string
@@ -164,9 +165,11 @@ export const FAQSection: React.FC<{
                   }}
                 >
                   {faq.answer ? (
-                    <div 
+                    <div
                       className="markdown text-md text-black!"
-                      dangerouslySetInnerHTML={{ __html: faq.answer }}
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeHtml(faq.answer),
+                      }}
                     />
                   ) : (
                     <p className="text-gray-500 italic">No answer available.</p>

@@ -1,12 +1,17 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
 import { createPayloadClient, fetchAllPages } from '@/services/payload/client'
+import { requireCronAuth } from '@/lib/cron-auth'
 
 /**
  * Clear Payload CMS cache
  * POST /api/clear-payload-cache
+ * Requires Authorization: Bearer ${CRON_SECRET}
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const clearedKeys: string[] = []
 
@@ -132,6 +137,6 @@ export async function POST() {
 /**
  * GET endpoint for convenience (same as POST)
  */
-export async function GET() {
-  return POST()
+export async function GET(request: NextRequest) {
+  return POST(request)
 }

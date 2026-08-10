@@ -3,6 +3,8 @@
 // Now uses database API instead of direct database access
 
 import { NextRequest, NextResponse } from 'next/server'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
+import { requireCronAuth } from '@/lib/cron-auth'
 
 /**
  * POST /api/process-matching
@@ -15,6 +17,9 @@ import { NextRequest, NextResponse } from 'next/server'
  * }
  */
 export async function POST(request: NextRequest) {
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     // Parse options from request body
     const body = await request.json().catch(() => ({})) as {
@@ -36,10 +41,10 @@ export async function POST(request: NextRequest) {
     console.log(`[Process Matching] Calling database API${dryRun ? ' (dry run)' : ''}`)
     
     // Call database API
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     const response = await fetch(`${apiUrl}/api/matching/process`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({ dryRun, minDate }),
     })
 
@@ -71,6 +76,9 @@ export async function POST(request: NextRequest) {
  * - minDate: string (ISO 8601 date)
  */
 export async function GET(request: NextRequest) {
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const searchParams = request.nextUrl.searchParams
     // Default to dry run for GET requests (safer for manual testing)
@@ -88,10 +96,10 @@ export async function GET(request: NextRequest) {
     console.log(`[Process Matching] Calling database API via GET${dryRun ? ' (dry run)' : ''}`)
     
     // Call database API
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     const response = await fetch(`${apiUrl}/api/matching/process`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({ dryRun, minDate }),
     })
 

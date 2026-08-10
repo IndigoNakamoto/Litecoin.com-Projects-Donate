@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronRight, faChevronUp } from '@fortawesome/free-solid-svg-icons'
+import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 interface ProjectUpdateProps {
   title: string
@@ -73,7 +74,7 @@ const ProjectUpdate: React.FC<ProjectUpdateProps> = ({
           <>
             <hr className="my-4 border-t border-gray-300" />
             <div
-              dangerouslySetInnerHTML={{ __html: content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
               className="markdown"
             />
           </>

@@ -7,6 +7,7 @@ import { kv } from '@/lib/kv'
 import { createWebflowClient, listCollectionItems } from '@/services/webflow/client'
 import { createPayloadClient, fetchAllPages } from '@/services/payload/client'
 import type { PayloadMatchingDonor } from '@/services/matching'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
 
 // Webflow matching donor interface (legacy)
 interface WebflowMatchingDonor {
@@ -162,8 +163,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Call database API instead of direct database access
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
-    const response = await fetch(`${apiUrl}/api/matching/donors-by-project?slug=${encodeURIComponent(slug)}`)
+    const apiUrl = getDatabaseApiUrl()
+    const response = await fetch(`${apiUrl}/api/matching/donors-by-project?slug=${encodeURIComponent(slug)}`, { headers: databaseApiHeaders() })
 
     if (!response.ok) {
       const errorText = await response.text()

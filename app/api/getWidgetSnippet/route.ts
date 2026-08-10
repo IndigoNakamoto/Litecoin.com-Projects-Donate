@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import axios from 'axios'
 import { getAccessToken } from '@/services/tgb/auth'
+import { TGB_ORGANIZATION_ID } from '@/lib/tgb-organization'
 
 export async function GET() {
   try {
@@ -12,7 +13,7 @@ export async function GET() {
     }
 
     // Litecoin Foundation org + DAF widget snippet (ported from the legacy project)
-    const organizationId = '1189134331'
+    const organizationId = String(TGB_ORGANIZATION_ID)
     const apiUrl = `https://public-api.tgbwidget.com/v1/organization/${organizationId}/widget-snippet`
 
     const requestBody = {

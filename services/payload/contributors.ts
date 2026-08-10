@@ -36,7 +36,7 @@ function transformContributor(payloadContributor: PayloadContributor): Contribut
     githubLink: payloadContributor.githubLink,
     youtubeLink: payloadContributor.youtubeLink,
     linkedinLink: payloadContributor.linkedinLink,
-    email: payloadContributor.email,
+    // Intentionally omit email from public contributor payloads
   }
 }
 

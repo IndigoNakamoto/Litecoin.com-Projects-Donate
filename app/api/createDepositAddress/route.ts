@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTGBClient } from '@/services/tgb/client'
 import Decimal from 'decimal.js'
+import { TGB_ORGANIZATION_ID } from '@/lib/tgb-organization'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const limited = rateLimit(`pledge:crypto:${clientIp(request)}`, { limit: 20 })
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfterSec) } }
+      )
+    }
+
     const body = await request.json()
 
+    // Ignore client-supplied organizationId — pin to server config
+    const organizationId = TGB_ORGANIZATION_ID
+
     const {
-      organizationId,
       projectSlug,
       pledgeCurrency,
       pledgeAmount,
@@ -30,8 +43,6 @@ export async function POST(request: NextRequest) {
 
     // Validate always required fields
     const missingFields: string[] = []
-    if (organizationId === undefined || organizationId === null)
-      missingFields.push('organizationId')
     if (!pledgeCurrency) missingFields.push('pledgeCurrency')
     if (!pledgeAmount) missingFields.push('pledgeAmount')
     if (!projectSlug) missingFields.push('projectSlug')
@@ -69,10 +80,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Parity with old project: create Donation record first (without pledgeId)
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     const createResponse = await fetch(`${apiUrl}/api/donations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({
         projectSlug,
         organizationId,
@@ -144,7 +155,7 @@ export async function POST(request: NextRequest) {
     // Parity with old project: update Donation with pledgeId and depositAddress
     const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({
         pledgeId,
         depositAddress,

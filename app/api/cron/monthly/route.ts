@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
 import FormData from 'form-data'
 import { generateReport } from '@/lib/reports'
+import { requireCronAuth } from '@/lib/cron-auth'
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL
 
@@ -12,6 +13,9 @@ const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL
  * Called by Vercel cron jobs on the 1st of each month at midnight UTC (0 0 1 * *)
  */
 export async function POST(request: NextRequest) {
+  const unauthorized = requireCronAuth(request)
+  if (unauthorized) return unauthorized
+
   if (!DISCORD_WEBHOOK_URL) {
     console.error('[cron/monthly] DISCORD_WEBHOOK_URL is not set')
     return NextResponse.json(

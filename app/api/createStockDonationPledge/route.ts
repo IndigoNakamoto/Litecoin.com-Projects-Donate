@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTGBClient } from '@/services/tgb/client'
 import Decimal from 'decimal.js'
+import { TGB_ORGANIZATION_ID } from '@/lib/tgb-organization'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const limited = rateLimit(`pledge:stock:${clientIp(request)}`, { limit: 20 })
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfterSec) } }
+      )
+    }
+
     const body = await request.json()
 
+    // Ignore client-supplied organizationId — pin to server config
+    const organizationId = TGB_ORGANIZATION_ID
+
     const {
-      organizationId,
       projectSlug,
       assetSymbol,
       assetDescription,
@@ -31,8 +44,6 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields (PersonalInfo step for stock always provides these)
     const missingFields: string[] = []
-    if (organizationId === undefined || organizationId === null)
-      missingFields.push('organizationId')
     if (!projectSlug) missingFields.push('projectSlug')
     if (!assetSymbol) missingFields.push('assetSymbol')
     if (!assetDescription) missingFields.push('assetDescription')
@@ -68,10 +79,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Parity with old project: create Donation record first (without donationUuid)
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     const createResponse = await fetch(`${apiUrl}/api/donations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({
         projectSlug,
         organizationId,
@@ -132,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Parity with old project: update Donation with donationUuid
     const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({ donationUuid }),
       signal: AbortSignal.timeout(10000),
     })

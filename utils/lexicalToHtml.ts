@@ -19,6 +19,28 @@ interface LexicalRoot {
   }
 }
 
+const ALLOWED_HREF_SCHEMES = /^(https?:|mailto:)/i
+const ALLOWED_HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+const ALLOWED_LINK_TARGETS = new Set(['_blank', '_self'])
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function escapeText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 /**
  * Check if content is Lexical JSON format
  */
@@ -39,16 +61,11 @@ function isLexicalJSON(content: unknown): content is LexicalRoot {
  * Serialize a single Lexical node to HTML
  */
 function serializeNode(node: LexicalNode): string {
-  const { type, children, text, format, style } = node
+  const { type, children, text, format } = node
 
-  // Text node
+  // Text node — never emit raw style attributes (injection vector)
   if (type === 'text' && text !== undefined) {
-    let html = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
+    let html = escapeText(text)
 
     // Apply formatting
     if (format) {
@@ -59,25 +76,22 @@ function serializeNode(node: LexicalNode): string {
       if (format & 16) html = `<code>${html}</code>` // code
     }
 
-    if (style) {
-      html = `<span style="${style}">${html}</span>`
-    }
-
     return html
   }
 
-  // Element nodes
-  let tag = 'div'
+  // Element nodes — only known safe tags
+  let tag: string | null = null
   let attributes = ''
 
   switch (type) {
     case 'paragraph':
       tag = 'p'
       break
-    case 'heading':
+    case 'heading': {
       const level = (node.tag as string) || 'h1'
-      tag = level
+      tag = ALLOWED_HEADINGS.has(level) ? level : 'h2'
       break
+    }
     case 'list':
       tag = node.listType === 'number' ? 'ol' : 'ul'
       break
@@ -90,29 +104,33 @@ function serializeNode(node: LexicalNode): string {
     case 'code':
       tag = 'pre'
       break
-    case 'link':
+    case 'link': {
       tag = 'a'
-      const url = node.url as string
-      if (url) {
-        attributes = ` href="${url.replace(/"/g, '&quot;')}"`
-        if (node.target) {
-          attributes += ` target="${node.target}"`
+      const url = typeof node.url === 'string' ? node.url.trim() : ''
+      if (url && ALLOWED_HREF_SCHEMES.test(url)) {
+        attributes = ` href="${escapeAttr(url)}"`
+        const target = typeof node.target === 'string' ? node.target : ''
+        if (target && ALLOWED_LINK_TARGETS.has(target)) {
+          attributes += ` target="${escapeAttr(target)}"`
+          if (target === '_blank') {
+            attributes += ' rel="noopener noreferrer"'
+          }
         }
       }
       break
+    }
     case 'linebreak':
       return '<br />'
     default:
-      // For unknown types, try to use the type as tag if it's a valid HTML tag
-      if (type && /^[a-z][a-z0-9]*$/.test(type)) {
-        tag = type
-      }
+      // Unknown types: serialize children only (never promote type to a tag)
+      tag = null
   }
 
-  // Serialize children
-  const childrenHtml = children
-    ? children.map(serializeNode).join('')
-    : ''
+  const childrenHtml = children ? children.map(serializeNode).join('') : ''
+
+  if (!tag) {
+    return childrenHtml
+  }
 
   return `<${tag}${attributes}>${childrenHtml}</${tag}>`
 }
@@ -131,7 +149,7 @@ export function lexicalToHtml(content: unknown): string {
           return serializeLexical(parsed)
         }
       } catch {
-        // Not JSON, might be HTML
+        // Not JSON, might be HTML — caller should sanitize before rendering
         return content
       }
     }
@@ -162,7 +180,7 @@ function serializeLexical(lexical: LexicalRoot): string {
   }
 
   const html = root.children.map(serializeNode).join('').trim()
-  
+
   // If the result is just empty paragraphs or whitespace, return empty string
   if (!html || html === '<p></p>' || html.match(/^<p>\s*<\/p>$/)) {
     return ''

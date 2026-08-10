@@ -85,11 +85,21 @@ export async function GET(request: NextRequest) {
     }
 
     const imageBuffer = await response.arrayBuffer()
-    const contentType = response.headers.get('content-type') || 'image/jpeg'
+    const upstreamType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+    const allowedTypes = new Set([
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ])
+    if (!allowedTypes.has(upstreamType)) {
+      return new NextResponse('Unsupported media type', { status: 415 })
+    }
 
     return new NextResponse(imageBuffer, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': upstreamType,
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     })

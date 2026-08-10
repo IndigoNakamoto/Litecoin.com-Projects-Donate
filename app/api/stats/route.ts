@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
 import { getAllPublishedProjects } from '@/services/cms/projects'
 import { Project } from '@/types/project'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
 
 export const runtime = 'nodejs'
 
@@ -88,11 +89,10 @@ export async function GET(request: NextRequest) {
       : undefined
 
     // Try to fetch from database API first
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     try {
       console.log('[stats] Fetching from database API:', apiUrl)
-      const apiResponse = await fetch(`${apiUrl}/api/stats`, {
-        signal: AbortSignal.timeout(10000), // 10 second timeout
+      const apiResponse = await fetch(`${apiUrl}/api/stats`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000), // 10 second timeout
       })
       
       if (apiResponse.ok) {

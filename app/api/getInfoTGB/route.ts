@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { kv } from '@/lib/kv'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
 
 type SuccessResponse = {
   funded_txo_sum: number
@@ -39,9 +40,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Call database API
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
-    const response = await fetch(`${apiUrl}/api/projects/${encodeURIComponent(slug)}/stats`, {
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+    const apiUrl = getDatabaseApiUrl()
+    const response = await fetch(`${apiUrl}/api/projects/${encodeURIComponent(slug)}/stats`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000), // 10 second timeout
     })
 
     if (!response.ok) {

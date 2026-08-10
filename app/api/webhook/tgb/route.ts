@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
+import { verifyTgbWebhookSignature } from '@/lib/tgb-webhook-auth'
 // Matching and database operations now handled by database API
 
 // Define Webhook Event Types
@@ -87,11 +89,10 @@ async function fetchDonationsByPledgeOrUuid(
   pledgeId?: string,
   donationUuid?: string
 ): Promise<{ donation: any; donations: any[] } | null> {
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const apiUrl = getDatabaseApiUrl()
 
   if (pledgeId) {
-    const response = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, {
-      signal: AbortSignal.timeout(10000),
+    const response = await fetch(`${apiUrl}/api/donations/by-pledge-id/${encodeURIComponent(pledgeId)}`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
@@ -100,8 +101,7 @@ async function fetchDonationsByPledgeOrUuid(
   }
 
   if (donationUuid) {
-    const response = await fetch(`${apiUrl}/api/donations/by-donation-uuid/${encodeURIComponent(donationUuid)}`, {
-      signal: AbortSignal.timeout(10000),
+    const response = await fetch(`${apiUrl}/api/donations/by-donation-uuid/${encodeURIComponent(donationUuid)}`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
@@ -116,10 +116,9 @@ async function fetchDonationsByPledgeOrUuid(
  * Helper function to check if webhook event exists via API
  */
 async function checkWebhookEventExists(eid: string): Promise<boolean> {
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const apiUrl = getDatabaseApiUrl()
   try {
-    const response = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, {
-      signal: AbortSignal.timeout(10000),
+    const response = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000),
     })
     return response.ok
   } catch {
@@ -148,7 +147,7 @@ async function handleDepositTransaction(
     return
   }
 
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const apiUrl = getDatabaseApiUrl()
   const result = await fetchDonationsByPledgeOrUuid(pledgeId, donationUuid)
 
   if (!result) {
@@ -169,7 +168,7 @@ async function handleDepositTransaction(
     const original = donations[0]
     const createResponse = await fetch(`${apiUrl}/api/donations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({
         projectSlug: original.project_slug,
         organizationId: original.organization_id,
@@ -206,7 +205,7 @@ async function handleDepositTransaction(
 
   const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       success: true,
       transactionHash: payload.transactionHash || null,
@@ -236,7 +235,7 @@ async function handleDepositTransaction(
 
   const webhookResponse = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       eventType: 'DEPOSIT_TRANSACTION',
       payload: payload,
@@ -302,10 +301,10 @@ async function handleTransactionConverted(
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}
 
   // PATCH by numeric id so only the correct row is updated
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const apiUrl = getDatabaseApiUrl()
   const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       success: true,
       convertedAt: new Date(Number(payload.convertedAt)).toISOString(),
@@ -337,7 +336,7 @@ async function handleTransactionConverted(
 
   const webhookResponse = await fetch(`${apiUrl}/api/webhook-events`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       eventType: 'TRANSACTION_CONVERTED',
       payload: payload,
@@ -393,10 +392,10 @@ async function handleUnknownEvent(
   // Update the Donation's eventData with the unknown event
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}
   
-  const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+  const apiUrl = getDatabaseApiUrl()
   const updateResponse = await fetch(`${apiUrl}/api/donations/${donation.id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       eventData: {
         ...existingEventData,
@@ -415,7 +414,7 @@ async function handleUnknownEvent(
   // Create WebhookEvent record via API
   const webhookResponse = await fetch(`${apiUrl}/api/webhook-events`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: databaseApiHeaders(),
     body: JSON.stringify({
       eventType,
       payload: payload,
@@ -457,6 +456,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[TGB Webhook] Received event: ${eventType}`)
 
+    const sig = verifyTgbWebhookSignature(request, encryptedPayload)
+    if (!sig.ok) {
+      return NextResponse.json({ error: sig.error }, { status: sig.status })
+    }
+
     // Decrypt the payload
     let decryptedPayload: DecryptedPayload
     try {
@@ -496,10 +500,10 @@ export async function POST(request: NextRequest) {
 
     // Trigger matching process via database API (non-blocking)
     // We don't await this to avoid delaying the webhook response
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     fetch(`${apiUrl}/api/matching/process`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({ dryRun: false }),
     })
       .then(async (response) => {

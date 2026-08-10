@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTGBClient } from '@/services/tgb/client'
 import axios from 'axios'
+import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
 
 type ChargeFiatDonationRequest = {
   pledgeId?: string
@@ -36,10 +37,10 @@ export async function POST(request: NextRequest) {
     const success = Boolean(chargeResponse?.data?.data?.success)
 
     // Parity with old project: update Donation.success by pledgeId
-    const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+    const apiUrl = getDatabaseApiUrl()
     const updateResponse = await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: databaseApiHeaders(),
       body: JSON.stringify({ success: success || false }),
       signal: AbortSignal.timeout(10000),
     })
@@ -62,10 +63,10 @@ export async function POST(request: NextRequest) {
 
       // Parity with old project: best-effort mark donation as failed
       try {
-        const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+        const apiUrl = getDatabaseApiUrl()
         await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: databaseApiHeaders(),
           body: JSON.stringify({ success: false }),
           signal: AbortSignal.timeout(10000),
         })
@@ -81,10 +82,10 @@ export async function POST(request: NextRequest) {
 
     // Parity with old project: best-effort mark donation as failed
     try {
-      const apiUrl = process.env.DATABASE_API_URL || 'https://projectsapi.lite.space'
+      const apiUrl = getDatabaseApiUrl()
       await fetch(`${apiUrl}/api/donations/by-pledge-id/${pledgeId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: databaseApiHeaders(),
         body: JSON.stringify({ success: false }),
         signal: AbortSignal.timeout(10000),
       })

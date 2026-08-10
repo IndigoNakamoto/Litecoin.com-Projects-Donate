@@ -60,8 +60,8 @@ export default function CouncilReviewAside({
         </dl>
 
         <p className="mt-6 border-t border-gray-400/40 pt-4 text-xs leading-relaxed text-gray-600">
-          For Open Source Fund council use. This URL is not authenticated—share only inside trusted
-          channels.
+          For Open Source Fund council use. Access requires a valid review token—share the full URL
+          only inside trusted channels.
         </p>
       </div>
     </aside>
