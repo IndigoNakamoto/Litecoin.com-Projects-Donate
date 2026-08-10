@@ -1,20 +1,8 @@
 import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-import axios from 'axios'
 import { prisma } from '@/lib/prisma'
 import { getPublicSiteOrigin, submissionDetailPath } from '@/lib/public-site-url'
-
-function normalizeSecret(value: string | undefined): string | undefined {
-  if (value == null) return undefined
-  let t = value.trim()
-  if (
-    (t.startsWith('"') && t.endsWith('"')) ||
-    (t.startsWith("'") && t.endsWith("'"))
-  ) {
-    t = t.slice(1, -1).trim()
-  }
-  return t.length > 0 ? t : undefined
-}
+import { getProjectsWebhookUrl, postDiscordWebhook } from '@/lib/discord'
 
 function parseSubmission(body: unknown): {
   projectName: string
@@ -37,7 +25,8 @@ function parseSubmission(body: unknown): {
 
 /**
  * POST /api/project-applications
- * Persists project submission to PostgreSQL and notifies Discord (if DISCORD_WEBHOOK_URL is set).
+ * Persists project submission to PostgreSQL and notifies Discord
+ * (#litecoin-projects-server via DISCORD_PROJECTS_WEBHOOK_URL, else DISCORD_WEBHOOK_URL).
  */
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -65,18 +54,27 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const webhook = normalizeSecret(process.env.DISCORD_WEBHOOK_URL)
+    const webhook = getProjectsWebhookUrl()
     if (webhook) {
-      try {
-        const origin = getPublicSiteOrigin(request)
-        const submissionUrl = `${origin}${submissionDetailPath(application.id)}`
-        const content = `New Project Application - ${application.projectName} ${submissionUrl}`
-        await axios.post(webhook, { content })
-      } catch (err) {
-        console.error('[api/project-applications] Discord webhook failed:', err)
-      }
+      const origin = getPublicSiteOrigin(request)
+      const submissionUrl = `${origin}${submissionDetailPath(application.id)}`
+      await postDiscordWebhook(webhook, {
+        embeds: [
+          {
+            title: 'New project application',
+            color: 0x345d9d,
+            fields: [
+              { name: 'Project', value: application.projectName, inline: false },
+              { name: 'Review', value: submissionUrl, inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      })
     } else {
-      console.warn('[api/project-applications] DISCORD_WEBHOOK_URL not set; skipping notification')
+      console.warn(
+        '[api/project-applications] DISCORD_PROJECTS_WEBHOOK_URL / DISCORD_WEBHOOK_URL not set; skipping notification'
+      )
     }
 
     return NextResponse.json({ message: 'success', id: application.id })

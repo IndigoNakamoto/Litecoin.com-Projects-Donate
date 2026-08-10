@@ -6,6 +6,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { databaseApiHeaders, getDatabaseApiUrl } from '@/lib/database-api'
 import { verifyTgbWebhookSignature } from '@/lib/tgb-webhook-auth'
+import {
+  notifyConfirmedDonation,
+  shouldAlertConfirmedDonation,
+  type ConfirmedDonationAlertInput,
+} from '@/lib/donation-discord-alert'
 // Matching and database operations now handled by database API
 
 // Define Webhook Event Types
@@ -126,6 +131,37 @@ async function checkWebhookEventExists(eid: string): Promise<boolean> {
   }
 }
 
+function buildAlertCandidate(
+  donation: {
+    id: number
+    project_slug?: string
+    projectSlug?: string
+    first_name?: string | null
+    firstName?: string | null
+    last_name?: string | null
+    lastName?: string | null
+  },
+  payload: {
+    status: string
+    valueAtDonationTimeUSD?: number
+    paymentMethod?: string
+  },
+  eventType: 'TRANSACTION_CONVERTED' | 'DEPOSIT_TRANSACTION'
+): ConfirmedDonationAlertInput | null {
+  const valueUsd = Number(payload.valueAtDonationTimeUSD) || 0
+  const candidate: ConfirmedDonationAlertInput = {
+    donationId: donation.id,
+    projectSlug: donation.project_slug || donation.projectSlug || 'unknown',
+    valueUsd,
+    firstName: donation.first_name ?? donation.firstName ?? null,
+    lastName: donation.last_name ?? donation.lastName ?? null,
+    status: payload.status,
+    eventType,
+    paymentMethod: payload.paymentMethod ?? null,
+  }
+  return shouldAlertConfirmedDonation(candidate) ? candidate : null
+}
+
 /**
  * Handler for DEPOSIT_TRANSACTION event.
  * Supports multiple deposits to the same pledge address: if the existing
@@ -134,7 +170,7 @@ async function checkWebhookEventExists(eid: string): Promise<boolean> {
 async function handleDepositTransaction(
   eventType: WebhookEventType,
   payload: DepositTransactionPayload
-): Promise<void> {
+): Promise<ConfirmedDonationAlertInput | null> {
   const { pledgeId, donationUuid, eid } = payload
 
   if ((!pledgeId && !donationUuid) || !eid) {
@@ -144,7 +180,7 @@ async function handleDepositTransaction(
   const existingEvent = await checkWebhookEventExists(eid)
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
-    return
+    return null
   }
 
   const apiUrl = getDatabaseApiUrl()
@@ -251,6 +287,7 @@ async function handleDepositTransaction(
   }
 
   console.log(`[TGB Webhook] Processed DEPOSIT_TRANSACTION: eid=${eid}, pledgeId=${pledgeId}, donationId=${donation.id}`)
+  return buildAlertCandidate(donation, payload, 'DEPOSIT_TRANSACTION')
 }
 
 /**
@@ -261,7 +298,7 @@ async function handleDepositTransaction(
 async function handleTransactionConverted(
   eventType: WebhookEventType,
   payload: TransactionConvertedPayload
-): Promise<void> {
+): Promise<ConfirmedDonationAlertInput | null> {
   const { pledgeId, eid } = payload
 
   if (!pledgeId || !eid) {
@@ -271,7 +308,7 @@ async function handleTransactionConverted(
   const existingEvent = await checkWebhookEventExists(eid)
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
-    return
+    return null
   }
 
   const result = await fetchDonationsByPledgeOrUuid(pledgeId)
@@ -353,6 +390,7 @@ async function handleTransactionConverted(
   }
 
   console.log(`[TGB Webhook] Processed TRANSACTION_CONVERTED: eid=${eid}, pledgeId=${pledgeId}, donationId=${donation.id}`)
+  return buildAlertCandidate(donation, payload, 'TRANSACTION_CONVERTED')
 }
 
 /**
@@ -361,14 +399,14 @@ async function handleTransactionConverted(
 async function handleUnknownEvent(
   eventType: string,
   payload: Record<string, unknown>
-): Promise<void> {
+): Promise<ConfirmedDonationAlertInput | null> {
   const pledgeId = payload.pledgeId as string | undefined
   const donationUuid = payload.donationUuid as string | undefined
   const eid = payload.eid as string | undefined
 
   if ((!pledgeId && !donationUuid) || !eid) {
     console.warn(`[TGB Webhook] Missing pledgeId/donationUuid or eid in payload for unknown event: ${eventType}`)
-    return
+    return null
   }
 
   // Check if the event has already been processed (idempotency)
@@ -376,7 +414,7 @@ async function handleUnknownEvent(
 
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
-    return
+    return null
   }
 
   // Find the associated Donation
@@ -384,7 +422,7 @@ async function handleUnknownEvent(
 
   if (!result) {
     console.warn(`[TGB Webhook] Donation not found for unknown event: pledgeId=${pledgeId}, donationUuid=${donationUuid}`)
-    return
+    return null
   }
 
   const donation = result.donation
@@ -432,6 +470,7 @@ async function handleUnknownEvent(
   }
 
   console.log(`[TGB Webhook] Processed unknown event: type=${eventType}, eid=${eid}`)
+  return null
 }
 
 /**
@@ -439,10 +478,19 @@ async function handleUnknownEvent(
  */
 const eventHandlers: Record<
   string,
-  (eventType: WebhookEventType, payload: DecryptedPayload) => Promise<void>
+  (
+    eventType: WebhookEventType,
+    payload: DecryptedPayload
+  ) => Promise<ConfirmedDonationAlertInput | null>
 > = {
-  DEPOSIT_TRANSACTION: handleDepositTransaction as (eventType: WebhookEventType, payload: DecryptedPayload) => Promise<void>,
-  TRANSACTION_CONVERTED: handleTransactionConverted as (eventType: WebhookEventType, payload: DecryptedPayload) => Promise<void>,
+  DEPOSIT_TRANSACTION: handleDepositTransaction as (
+    eventType: WebhookEventType,
+    payload: DecryptedPayload
+  ) => Promise<ConfirmedDonationAlertInput | null>,
+  TRANSACTION_CONVERTED: handleTransactionConverted as (
+    eventType: WebhookEventType,
+    payload: DecryptedPayload
+  ) => Promise<ConfirmedDonationAlertInput | null>,
 }
 
 /**
@@ -496,27 +544,38 @@ export async function POST(request: NextRequest) {
 
     // Process the event
     const handlerFunction = eventHandlers[eventType] || handleUnknownEvent
-    await handlerFunction(eventType, decryptedPayload)
+    const alertCandidate = await handlerFunction(eventType, decryptedPayload)
 
-    // Trigger matching process via database API (non-blocking)
+    // Trigger matching process via database API (non-blocking), then Discord alert
     // We don't await this to avoid delaying the webhook response
     const apiUrl = getDatabaseApiUrl()
     fetch(`${apiUrl}/api/matching/process`, {
       method: 'POST',
       headers: databaseApiHeaders(),
       body: JSON.stringify({ dryRun: false }),
+      signal: AbortSignal.timeout(60000),
     })
       .then(async (response) => {
         if (response.ok) {
           const result = await response.json()
-          console.log(`[TGB Webhook] Matching completed: processed=${result.processed}, matched=${result.matched}`)
+          console.log(
+            `[TGB Webhook] Matching completed: processed=${result.processed}, matched=${result.matched}`
+          )
         } else {
           const errorText = await response.text()
-          console.error(`[TGB Webhook] Matching API returned ${response.status}: ${errorText}`)
+          console.error(
+            `[TGB Webhook] Matching API returned ${response.status}: ${errorText}`
+          )
         }
       })
       .catch((error) => {
         console.error('[TGB Webhook] Matching API call failed:', error)
+      })
+      .finally(() => {
+        if (!alertCandidate) return
+        notifyConfirmedDonation(alertCandidate).catch((err) => {
+          console.error('[TGB Webhook] Discord donation alert failed:', err)
+        })
       })
 
     return NextResponse.json({ message: 'Webhook processed successfully' })

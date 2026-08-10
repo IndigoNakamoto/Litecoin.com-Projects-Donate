@@ -31,6 +31,8 @@ RUN mkdir .next
 RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# pdfkit standard fonts (AFM) are read from disk; standalone tracing can miss them.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pdfkit/js/data ./node_modules/pdfkit/js/data
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000

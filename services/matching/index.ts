@@ -32,6 +32,18 @@ export interface MatchingDonorWithRemaining extends PayloadMatchingDonor {
   supportedProjectSlugs: string[]
 }
 
+/** Ops report: annual matching pool remaining for the current calendar year */
+export interface MatchingPoolStatus {
+  donorId: string
+  name: string
+  poolLabel: string
+  matchingType: 'all-projects' | 'per-project'
+  cap: number
+  matchedYtd: number
+  remaining: number
+  supportedProjectSlugs: string[]
+}
+
 /**
  * Result of the matching process
  */
@@ -110,6 +122,59 @@ function getSupportedProjectSlugs(donor: PayloadMatchingDonor): string[] {
       return project.slug
     })
     .filter((slug): slug is string => slug !== null)
+}
+
+function poolLabelForSlugs(slugs: string[]): string {
+  const normalized = slugs.map((s) => s.trim().toLowerCase())
+  if (normalized.length === 1 && normalized[0] === 'litecoin-foundation') {
+    return 'Foundation'
+  }
+  if (normalized.includes('litecoin-foundation') && normalized.length > 1) {
+    return 'Mixed'
+  }
+  return 'Projects'
+}
+
+function donorWindowContains(donor: PayloadMatchingDonor, at: Date): boolean {
+  const start = new Date(donor.startDate)
+  const end = new Date(donor.endDate)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false
+  return start.getTime() <= at.getTime() && at.getTime() <= end.getTime()
+}
+
+/**
+ * Active matching donors with YTD matched + remaining for the current calendar year.
+ * Only includes donors whose start/end window contains "now" so expired prior-year
+ * duplicates (still status=active in Payload) do not clutter ops reports.
+ */
+export async function getMatchingPoolStatuses(
+  year: number = new Date().getFullYear()
+): Promise<MatchingPoolStatus[]> {
+  const donors = await getActiveMatchingDonorsFromPayload()
+  const now = new Date()
+  const currentDonors = donors.filter((d) => donorWindowContains(d, now))
+  if (currentDonors.length === 0) return []
+
+  const donorIds = currentDonors.map((d) => String(d.webflowId || d.id))
+  const matchedByYear = await getDonorsMatchedAmountsByYear(donorIds)
+
+  return currentDonors.map((donor) => {
+    const donorId = String(donor.webflowId || donor.id)
+    const slugs = getSupportedProjectSlugs(donor)
+    const matchedYtd = matchedByYear.get(`${donorId}:${year}`) ?? 0
+    const cap = donor.totalMatchingAmount
+    const remaining = Math.max(0, cap - matchedYtd)
+    return {
+      donorId,
+      name: donor.name,
+      poolLabel: poolLabelForSlugs(slugs),
+      matchingType: donor.matchingType,
+      cap,
+      matchedYtd,
+      remaining,
+      supportedProjectSlugs: slugs,
+    }
+  })
 }
 
 interface ProjectTarget {

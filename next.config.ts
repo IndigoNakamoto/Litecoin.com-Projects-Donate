@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
   // Prevent Next from inferring the monorepo root from a different lockfile.
   // This avoids confusing warnings and makes output tracing deterministic.
   outputFileTracingRoot: path.join(__dirname),
+  // pdfkit loads Helvetica.afm etc. from disk at runtime — keep it external
+  // and include AFM data in the standalone trace for cron PDF reports.
+  serverExternalPackages: ["pdfkit"],
+  outputFileTracingIncludes: {
+    "/api/cron/daily/*": ["./node_modules/pdfkit/js/data/**/*"],
+    "/api/cron/monthly/*": ["./node_modules/pdfkit/js/data/**/*"],
+  },
   images: {
     remotePatterns: [
       {
