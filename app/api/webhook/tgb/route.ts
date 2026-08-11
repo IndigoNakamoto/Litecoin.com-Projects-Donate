@@ -118,17 +118,69 @@ async function fetchDonationsByPledgeOrUuid(
 }
 
 /**
- * Helper function to check if webhook event exists via API
+ * Helper function to check if webhook event exists via API.
+ * Scoped to pledgeId/donationUuid when provided — TGB reuses short eids across pledges.
  */
-async function checkWebhookEventExists(eid: string): Promise<boolean> {
+async function checkWebhookEventExists(
+  eid: string,
+  pledgeId?: string,
+  donationUuid?: string
+): Promise<boolean> {
   const apiUrl = getDatabaseApiUrl()
   try {
-    const response = await fetch(`${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}`, { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000),
-    })
+    const params = new URLSearchParams()
+    if (pledgeId) params.set('pledgeId', pledgeId)
+    if (donationUuid) params.set('donationUuid', donationUuid)
+    const qs = params.toString()
+    const response = await fetch(
+      `${apiUrl}/api/webhook-events/${encodeURIComponent(eid)}${qs ? `?${qs}` : ''}`,
+      { headers: databaseApiHeaders(), signal: AbortSignal.timeout(10000) }
+    )
     return response.ok
   } catch {
     return false
   }
+}
+
+async function createClonedDonation(
+  original: any,
+  pledgeAmount: string
+): Promise<any> {
+  const apiUrl = getDatabaseApiUrl()
+  const createResponse = await fetch(`${apiUrl}/api/donations`, {
+    method: 'POST',
+    headers: databaseApiHeaders(),
+    body: JSON.stringify({
+      projectSlug: original.project_slug,
+      organizationId: original.organization_id,
+      donationType: original.donation_type,
+      pledgeAmount,
+      assetSymbol: original.asset_symbol,
+      assetDescription: original.asset_description,
+      firstName: original.first_name,
+      lastName: original.last_name,
+      donorEmail: original.donor_email,
+      isAnonymous: original.is_anonymous,
+      taxReceipt: original.tax_receipt,
+      joinMailingList: original.join_mailing_list,
+      socialX: original.social_x,
+      socialFacebook: original.social_facebook,
+      socialLinkedIn: original.social_linkedin,
+      pledgeId: original.pledge_id,
+      depositAddress: original.deposit_address,
+    }),
+    signal: AbortSignal.timeout(10000),
+  })
+
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text()
+    throw new Error(
+      `Failed to create donation for additional deposit: ${createResponse.status} ${errorText}`
+    )
+  }
+
+  const created = await createResponse.json()
+  return created.donation
 }
 
 function buildAlertCandidate(
@@ -177,7 +229,7 @@ async function handleDepositTransaction(
     throw new Error('Missing pledgeId/donationUuid or eid in payload')
   }
 
-  const existingEvent = await checkWebhookEventExists(eid)
+  const existingEvent = await checkWebhookEventExists(eid, pledgeId, donationUuid)
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
     return null
@@ -200,40 +252,10 @@ async function handleDepositTransaction(
   if (unfilled) {
     donation = unfilled
   } else {
-    // All rows already have a deposit — create a new row cloning donor/project info
-    const original = donations[0]
-    const createResponse = await fetch(`${apiUrl}/api/donations`, {
-      method: 'POST',
-      headers: databaseApiHeaders(),
-      body: JSON.stringify({
-        projectSlug: original.project_slug,
-        organizationId: original.organization_id,
-        donationType: original.donation_type,
-        pledgeAmount: payload.amount?.toString() || '0',
-        assetSymbol: original.asset_symbol,
-        assetDescription: original.asset_description,
-        firstName: original.first_name,
-        lastName: original.last_name,
-        donorEmail: original.donor_email,
-        isAnonymous: original.is_anonymous,
-        taxReceipt: original.tax_receipt,
-        joinMailingList: original.join_mailing_list,
-        socialX: original.social_x,
-        socialFacebook: original.social_facebook,
-        socialLinkedIn: original.social_linkedin,
-        pledgeId: original.pledge_id,
-        depositAddress: original.deposit_address,
-      }),
-      signal: AbortSignal.timeout(10000),
-    })
-
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text()
-      throw new Error(`Failed to create donation for additional deposit: ${createResponse.status} ${errorText}`)
-    }
-
-    const created = await createResponse.json()
-    donation = created.donation
+    donation = await createClonedDonation(
+      donations[0],
+      payload.amount?.toString() || '0'
+    )
     console.log(`[TGB Webhook] Created new donation id=${donation.id} for additional deposit to pledgeId=${pledgeId}`)
   }
 
@@ -305,7 +327,7 @@ async function handleTransactionConverted(
     throw new Error('Missing pledgeId or eid in payload')
   }
 
-  const existingEvent = await checkWebhookEventExists(eid)
+  const existingEvent = await checkWebhookEventExists(eid, pledgeId)
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
     return null
@@ -316,23 +338,21 @@ async function handleTransactionConverted(
     throw new Error(`Donation with pledgeId ${pledgeId} not found`)
   }
 
-  // Match by transactionHash to find the correct deposit row
-  let donation: any = null
   const { donations } = result
+  let donation: any =
+    (payload.transactionHash
+      ? donations.find((d: any) => d.transaction_hash === payload.transactionHash)
+      : undefined) || donations.find((d: any) => !d.transaction_hash)
 
-  if (payload.transactionHash && donations.length > 1) {
-    donation = donations.find(
-      (d: any) => d.transaction_hash === payload.transactionHash
+  // Serial deposit with only TRANSACTION_CONVERTED — clone instead of overwrite
+  if (!donation) {
+    donation = await createClonedDonation(
+      donations[0],
+      payload.amount?.toString() || '0'
     )
-  }
-
-  // Fallback to first row (backward compat for single-deposit pledges)
-  if (!donation) {
-    donation = result.donation
-  }
-
-  if (!donation) {
-    throw new Error(`Donation with pledgeId ${pledgeId} not found`)
+    console.log(
+      `[TGB Webhook] Created new donation id=${donation.id} for additional converted deposit to pledgeId=${pledgeId}`
+    )
   }
 
   const existingEventData = (donation.event_data as Record<string, unknown>) || {}
@@ -344,6 +364,7 @@ async function handleTransactionConverted(
     headers: databaseApiHeaders(),
     body: JSON.stringify({
       success: true,
+      transactionHash: payload.transactionHash || donation.transaction_hash || null,
       convertedAt: new Date(Number(payload.convertedAt)).toISOString(),
       netValueAmount: payload.netValueAmount,
       grossAmount: payload.grossAmount,
@@ -358,6 +379,7 @@ async function handleTransactionConverted(
       status: payload.status,
       timestampms: new Date(Number(payload.timestampms)).toISOString(),
       eid: payload.eid,
+      paymentMethod: (payload as any).paymentMethod || donation.payment_method || null,
       eventData: {
         ...existingEventData,
         [eventType]: payload,
@@ -410,7 +432,7 @@ async function handleUnknownEvent(
   }
 
   // Check if the event has already been processed (idempotency)
-  const existingEvent = await checkWebhookEventExists(eid)
+  const existingEvent = await checkWebhookEventExists(eid, pledgeId, donationUuid)
 
   if (existingEvent) {
     console.log(`[TGB Webhook] Event already processed: ${eid}`)
